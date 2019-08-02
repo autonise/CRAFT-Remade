@@ -18,10 +18,10 @@ pretrained_path = '/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/
 
 lr = {
 	1: 5e-5,
-	15000: 9e-4,
-	30000: 5e-4,
-	45000: 1e-4,
-	60000: 5e-5,
+	10000: 2.5e-5,
+	20000: 1e-5,
+	40000: 5e-6,
+	60000: 1e-6,
 }
 
 periodic_fscore = 100

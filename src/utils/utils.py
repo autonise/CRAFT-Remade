@@ -1,6 +1,7 @@
 from shapely.geometry import Polygon
 import numpy as np
-import config
+import train_synth.config as config
+# ToDO pass the config everytime when it is required. Don't make the utils folder specific to some config
 import cv2
 import networkx as nx
 

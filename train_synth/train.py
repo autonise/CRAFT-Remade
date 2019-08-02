@@ -151,7 +151,7 @@ def main():
 
 	seed()
 
-	copyfile('config.py', config.save_path + '/config.py')
+	copyfile('train_synth/config.py', config.save_path + '/config.py')
 
 	model = UNetWithResnet50Encoder()
 
