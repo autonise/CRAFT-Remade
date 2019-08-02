@@ -153,8 +153,8 @@ def get_word_poly(weight, weight_affinity, character_threshold=config.threshold_
 
 	for i in range(weight.shape[0]):
 
-		im2, all_characters, hierarchy = cv2.findContours(weight[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-		im2, all_joins, hierarchy = cv2.findContours(weight_affinity[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+		all_characters, hierarchy = cv2.findContours(weight[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+		all_joins, hierarchy = cv2.findContours(weight_affinity[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
 		if len(all_characters) > 1000:
 			word_bbox.append(np.zeros([0]))

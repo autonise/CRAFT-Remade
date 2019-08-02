@@ -27,14 +27,14 @@ class DataLoaderSYNTH(data.Dataset):
 	def __init__(self, type_):
 
 		self.type_ = type_
-		self.base_path = '/home/Krishna.Wadhwani/Dataset/Dataset/SynthTextDownloaded/Images'
+		self.base_path = '/home/SharedData/Mayank/SynthText/Images'
 		if DEBUG:
 			import os
 			if not os.path.exists('cache.pkl'):
 				with open('cache.pkl', 'wb') as f:
 					import pickle
 					from scipy.io import loadmat
-					mat = loadmat('/home/Krishna.Wadhwani/Dataset/Dataset/SynthTextDownloaded/gt.mat')
+					mat = loadmat('/home/SharedData/Mayank/SynthText/gt.mat')
 					pickle.dump([mat['imnames'][0][0:1000], mat['charBB'][0][0:1000], mat['txt'][0][0:1000]], f)
 					print('Created the pickle file, rerun the program')
 					exit(0)
@@ -47,7 +47,7 @@ class DataLoaderSYNTH(data.Dataset):
 		else:
 
 			from scipy.io import loadmat
-			mat = loadmat('/home/Krishna.Wadhwani/Dataset/Dataset/SynthTextDownloaded/gt.mat')
+			mat = loadmat('/home/SharedData/Mayank/SynthText/gt.mat')
 
 			total_number = mat['imnames'][0].shape[0]
 			train_images = int(total_number * 0.9)

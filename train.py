@@ -30,7 +30,7 @@ def save(data, output, target, target_affinity, epoch, no):
 
 	batchsize = output.shape[0]
 
-	base = 'train_synthesis/'+str(epoch)+'_'+str(no)+'/'
+	base = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'+str(epoch)+'_'+str(no)+'/'
 
 	os.makedirs(base, exist_ok=True)
 	for i in range(batchsize):

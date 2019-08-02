@@ -1,10 +1,10 @@
-num_cuda = "0,1,2,3,4,5"
+num_cuda = "0,1,2,3"
 seed = 0
-save_path = 'model'
+save_path = '/home/SharedData/Mayank/Models/SYNTH'
 use_cuda = True
 
 batchsize = {
-	'train': 18,
+	'train': 12,
 	'test': 1
 }
 
@@ -13,7 +13,7 @@ if DEBUG:
 	batchsize['train'] = 1
 	num_cuda = '0'
 
-pretrained = True
+pretrained = False
 pretrained_path = '/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/model/41958_model.pkl'
 pretrained_path_test = '/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/model/final_model.pkl'
 
@@ -26,7 +26,7 @@ lr = {
 
 periodic_fscore = 100
 periodic_output = 1000
-periodic_save = 999
+periodic_save = 10000
 
 threshold_character = 0.5
 threshold_affinity = 0.5
