@@ -105,7 +105,7 @@ def get_smooth_polygon(word_contours):
 		convex_hull = np.repeat(convex_hull, 4, axis=0)
 	if convex_hull.shape[0] == 2:
 		convex_hull = np.repeat(convex_hull, 2, axis=0)
-	return convex_hull # Will have shape - number_of_points, 1, 2
+	return convex_hull  # Will have shape - number_of_points, 1, 2
 
 
 def join(characters, joints):

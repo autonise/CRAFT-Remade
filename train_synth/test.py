@@ -1,6 +1,6 @@
-import config
-from model import UNetWithResnet50Encoder, Criterian
-from dataloader import DataLoaderSYNTH
+import train_synth.config as config
+from src.model import UNetWithResnet50Encoder, Criterian
+from train_synth.dataloader import DataLoaderSYNTH
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
@@ -8,8 +8,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-from utils.parallel import DataParallelModel, DataParallelCriterion
-from utils.utils import calculate_batch_fscore, get_word_poly
+from src.utils.parallel import DataParallelModel, DataParallelCriterion
+from src.utils.utils import calculate_batch_fscore, get_word_poly
 
 DATA_DEBUG = False
 
@@ -51,7 +51,7 @@ def save(data, output, target, target_affinity, epoch, no):
 		plt.imsave(base + str(i) + '/pred_affinity_thresh.png', np.float32(affinity_bbox>config.threshold_affinity), cmap='gray')
 
 
-def test(dataloader, model):
+def test(dataloader, lossCriterian, model):
 
 	with torch.no_grad():
 
@@ -88,7 +88,7 @@ def test(dataloader, model):
 			if no % config.periodic_output == 0 and no != 0:
 				if type(output) == list:
 					output = torch.cat(output, dim=0)
-				save(image, output, weight, weight_affinity, epoch, no)
+				save(image, output, weight, weight_affinity, 0, no)
 
 		return all_loss
 
@@ -104,7 +104,7 @@ def seed():
 	torch.backends.cudnn.deterministic = True
 
 
-if __name__ == "__main__":
+def main(model_path):
 
 	seed()
 
@@ -129,7 +129,12 @@ if __name__ == "__main__":
 		test_dataloader, batch_size=config.batchsize['test'],
 		shuffle=True, num_workers=16)
 
-	saved_model = torch.load(config.pretrained_path_test)
+	saved_model = torch.load(model_path)
 	model.load_state_dict(saved_model['state_dict'])
 
-	all_loss = test(test_dataloader, model)
+	all_loss = test(test_dataloader, lossCriterian, model)
+	print('Average Loss on the testing set is:', all_loss)
+
+
+if __name__ == "__main__":
+	main('/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/model/final_model.pkl')

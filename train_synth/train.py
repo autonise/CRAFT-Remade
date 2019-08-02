@@ -1,6 +1,6 @@
-import config
-from model import UNetWithResnet50Encoder, Criterian
-from dataloader import DataLoaderSYNTH
+import train_synth.config as config
+from src.model import UNetWithResnet50Encoder, Criterian
+from .dataloader import DataLoaderSYNTH
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
@@ -9,8 +9,8 @@ from shutil import copyfile
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-from utils.parallel import DataParallelModel, DataParallelCriterion
-from utils.utils import calculate_batch_fscore, get_word_poly
+from src.utils.parallel import DataParallelModel, DataParallelCriterion
+from src.utils.utils import calculate_batch_fscore, get_word_poly
 
 DATA_DEBUG = False
 
@@ -50,7 +50,7 @@ def save(data, output, target, target_affinity, epoch, no):
 		plt.imsave(base + str(i) + '/pred_affinity_thresh.png', np.float32(affinity_bbox>config.threshold_affinity), cmap='gray')
 
 
-def train(dataloader, model, optimizer, epoch=0, all_loss = [], all_accuracy = []):
+def train(dataloader, lossCriterian, model, optimizer, STARTING_NO, epoch=0, all_loss=[], all_accuracy=[]):
 
 	model.train()
 	optimizer.zero_grad()
@@ -147,7 +147,7 @@ def seed():
 	torch.backends.cudnn.deterministic = True
 
 
-if __name__ == "__main__":
+def main():
 
 	seed()
 
@@ -184,13 +184,13 @@ if __name__ == "__main__":
 	else:
 		STARTING_NO = 0
 		all_loss = []
-		all_accuracy = []
 
 	for epoch in range(1, 2):
 		if epoch != 0:
 			STARTING_NO = 0
-		all_loss += train(train_dataloader, model, optimizer, epoch=epoch)
-
+		all_loss += train(
+			train_dataloader, lossCriterian, model, optimizer, STARTING_NO=STARTING_NO, epoch=epoch,
+			all_loss=all_loss)
 
 	torch.save(
 		{
@@ -202,3 +202,8 @@ if __name__ == "__main__":
 	plt.plot(all_loss)
 	plt.savefig(config.save_path + '/loss_plot_training.png')
 	plt.clf()
+
+
+if __name__ == "__main__":
+
+	main()
