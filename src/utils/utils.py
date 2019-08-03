@@ -31,8 +31,7 @@ def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_
 		all_characters, hierarchy = cv2.findContours(weight[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 		all_joins, hierarchy = cv2.findContours(weight_affinity[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-		characters.append(np.copy(all_characters))
-		joins.append(np.copy(all_joins))
+		
 
 		if len(all_characters) > 1000:
 			word_bbox.append(np.zeros([0]))
@@ -49,7 +48,8 @@ def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_
 			rect = cv2.minAreaRect(all_joins[ii])
 			all_joins[ii] = cv2.boxPoints(rect)
 
-
+		characters.append(np.copy(all_characters))
+		joins.append(np.copy(all_joins))
 		word_bbox.append(np.array(join(all_characters, all_joins)))
 
 	to_return={}
