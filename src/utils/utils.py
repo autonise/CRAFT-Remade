@@ -5,6 +5,58 @@ import train_synth.config as config
 import cv2
 import networkx as nx
 
+def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_character, affinity_threshold=config.threshold_affinity):
+	assert weight.max() <= 1, 'Weight has not been normalised'
+	assert weight.min() >= 0, 'Weight has not been normalised'
+
+	weight[weight > character_threshold] = 255
+	weight[weight != 255] = 0
+
+	assert weight_affinity.max() <= 1, 'Weight Affinity has not been normalised'
+	assert weight_affinity.min() >= 0, 'Weight Affinity has not been normalised'
+
+	weight_affinity[weight_affinity > affinity_threshold] = 255
+	weight_affinity[weight_affinity != 255] = 0
+
+	weight = weight.astype(np.uint8)
+	weight_affinity = weight_affinity.astype(np.uint8)
+
+	word_bbox = []
+	characters = []
+	joins = []
+	
+
+	for i in range(weight.shape[0]):
+
+		all_characters, hierarchy = cv2.findContours(weight[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+		all_joins, hierarchy = cv2.findContours(weight_affinity[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+		characters.append(np.copy(all_characters))
+		joins.append(np.copy(all_joins))
+
+		if len(all_characters) > 1000:
+			word_bbox.append(np.zeros([0]))
+			continue
+		if len(all_joins) > 1000:
+			word_bbox.append(np.zeros([0]))
+			continue
+
+		for ii in range(len(all_characters)):
+			rect = cv2.minAreaRect(all_characters[ii])
+			all_characters[ii] = cv2.boxPoints(rect)
+
+		for ii in range(len(all_joins)):
+			rect = cv2.minAreaRect(all_joins[ii])
+			all_joins[ii] = cv2.boxPoints(rect)
+
+
+		word_bbox.append(np.array(join(all_characters, all_joins)))
+
+	to_return={}
+	to_return['word_bbox']=word_bbox
+	to_return['characters']=characters
+	to_return['joins']=joins
+	return 
 
 def order_points(pts):
 
@@ -169,7 +221,6 @@ def get_word_poly(weight, weight_affinity, character_threshold=config.threshold_
 			all_characters[ii] = cv2.boxPoints(rect)
 
 		for ii in range(len(all_joins)):
-
 			rect = cv2.minAreaRect(all_joins[ii])
 			all_joins[ii] = cv2.boxPoints(rect)
 

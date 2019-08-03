@@ -3,11 +3,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
+import config
 
 DEBUG = False
 
 
 def four_point_transform(image, pts):
+
+	# param pts:-The coordinates of the bounding box,
+	# param image:-gausian image
+	# function:-Using the pts and the image a perspective transform is performed 
+	# returns the transformed 2d Gausian image
+
 
 	max_x, max_y = np.max(pts[:, 0]).astype(np.int32), np.max(pts[:, 1]).astype(np.int32)
 
@@ -24,6 +31,12 @@ def four_point_transform(image, pts):
 
 
 def resize(image, character, side=768):
+
+	#param image
+	#param character
+	#param side=length of the max_side of the image to be resize default=768
+	#return : np.array(side,side,3) containing the resize the image and the average values ,resize the character
+
 
 	height, width, channel = image.shape
 	max_side = max(height, width)
@@ -60,6 +73,11 @@ gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np
 
 def add_character(image, bbox):
 
+	# param image:
+	# param bbox:co-ordinates of the bounding-box
+	# function:generate the transformed 2d gausian heatmap for the region score
+	# return : the modified image
+
 	backup = image.copy()
 
 	try:
@@ -85,6 +103,12 @@ def add_character(image, bbox):
 
 
 def add_affinity(image, bbox_1, bbox_2):
+
+	# param image 
+	# param bbox1=coordinates of the first bounding box
+	# param bbox2=coordinates of the second bounding box
+	# function:- generate an affinity box using bbox1 and bbox2 
+	# return func
 
 	backup = image.copy()
 
@@ -152,14 +176,14 @@ class DataLoaderSYNTH(data.Dataset):
 	def __init__(self, type_):
 
 		self.type_ = type_
-		self.base_path = '/home/SharedData/Mayank/SynthText/Images'
+		self.base_path = config.DataLoaderSYNTH_base_path
 		if DEBUG:
 			import os
 			if not os.path.exists('cache.pkl'):
 				with open('cache.pkl', 'wb') as f:
 					import pickle
 					from scipy.io import loadmat
-					mat = loadmat('/home/SharedData/Mayank/SynthText/gt.mat')
+					mat = loadmat(config.DataLoaderSYNTH_mat)
 					pickle.dump([mat['imnames'][0][0:1000], mat['charBB'][0][0:1000], mat['txt'][0][0:1000]], f)
 					print('Created the pickle file, rerun the program')
 					exit(0)
@@ -172,7 +196,7 @@ class DataLoaderSYNTH(data.Dataset):
 		else:
 
 			from scipy.io import loadmat
-			mat = loadmat('/home/SharedData/Mayank/SynthText/gt.mat')
+			mat = loadmat(config.DataLoaderSYNTH_mat)
 
 			total_number = mat['imnames'][0].shape[0]
 			train_images = int(total_number * 0.9)

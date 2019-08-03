@@ -179,7 +179,7 @@ def main():
 		model.load_state_dict(saved_model['state_dict'])
 		optimizer.load_state_dict(saved_model['optimizer'])
 		STARTING_NO = int(config.pretrained_path.split('/')[-1].split('_')[0])
-		all_loss = np.load('model/loss_plot_training.npy').tolist()
+		all_loss = np.load(config.pretrained_loss_plot_training).tolist()
 
 	else:
 		STARTING_NO = 0

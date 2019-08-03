@@ -9,7 +9,7 @@ def train(model, optimizer, iteration):
 	iterator = tqdm(dataloader)
 
 	def change_lr(no):
-
+		#Change learning rate while training
 		for i in config.lr:
 			if i == no:
 				print('Learning Rate Changed to ', config.lr[i])

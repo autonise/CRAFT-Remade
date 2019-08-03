@@ -15,6 +15,7 @@ if DEBUG:
 
 pretrained = False
 pretrained_path = '/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/model/41958_model.pkl'
+pretrained_loss_plot_training ='model/loss_plot_training.npy'
 
 lr = {
 	1: 5e-5,
@@ -33,3 +34,7 @@ threshold_affinity = 0.5
 threshold_fscore = 0.5
 threshold_first_character = 0.5
 threshold_boundary = 0.5
+
+DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
+DataLoaderSYNTH_mat = '/home/SharedData/Mayank/SynthText/gt.mat'
+
