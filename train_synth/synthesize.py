@@ -93,3 +93,39 @@ def main(folder_path, base_path_character=None, base_path_affinity=None, model_p
 		model.load_state_dict(saved_model['state_dict'])
 
 	synthesize(infer_dataloader, model, base_path_affinity, base_path_character)
+
+
+def generator(folder_path, target_path, base_path_character=None, base_path_affinity=None, model_path=None, model=None):
+
+	# ToDo - Standardize the target_path to have a structure
+	# ToDo - Create the Bbox generator given characters, return the character bbox corresponding to each word as well
+	# ToDo - While synthesizing, match the predicted with the target bbox
+	# ToDo - Create the weight for all the target bbox, based on how many characters were there in the prediction and expected
+	# ToDo - Create a dataloader which takes mixture of SYNTH and ICDAR2013 dataset
+	# ToDo - In the dataloader all the SYNTH text should have 100 percent confidence
+	# ToDo - Check if everything works in a iterative fashion
+
+	os.makedirs(base_path_affinity, exist_ok=True)
+	os.makedirs(base_path_character, exist_ok=True)
+
+	if base_path_character is None:
+		base_path_character = '/'.join(folder_path.split('/')[:-1])+'/target_character'
+	if base_path_affinity is None:
+		base_path_affinity = '/'.join(folder_path.split('/')[:-1])+'/target_affinity'
+
+	infer_dataloader = DataLoaderEval(folder_path)
+
+	infer_dataloader = DataLoader(
+		infer_dataloader, batch_size=16,
+		shuffle=True, num_workers=8)
+
+	if model is None:
+		model = UNetWithResnet50Encoder()
+
+		if config.use_cuda:
+			model = model.cuda()
+
+		saved_model = torch.load(model_path)
+		model.load_state_dict(saved_model['state_dict'])
+
+	synthesize(infer_dataloader, model, base_path_affinity, base_path_character)

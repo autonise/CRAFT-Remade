@@ -1,7 +1,7 @@
 from .trainer import train
 from src.model import UNetWithResnet50Encoder
 import train_weak_supervision.config as config
-from train_synth.synthesize import main as generator
+from train_synth.synthesize import generator
 
 import torch
 
