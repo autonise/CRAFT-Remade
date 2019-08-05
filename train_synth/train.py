@@ -9,6 +9,8 @@ from shutil import copyfile
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import config
+
 from src.utils.parallel import DataParallelModel, DataParallelCriterion
 from src.utils.utils import calculate_batch_fscore, get_word_poly
 
@@ -30,7 +32,7 @@ def save(data, output, target, target_affinity, epoch, no):
 
 	batchsize = output.shape[0]
 
-	base = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'+str(epoch)+'_'+str(no)+'/'
+	base = config.DataLoaderSYNTH_Train_Synthesis+str(epoch)+'_'+str(no)+'/'
 
 	os.makedirs(base, exist_ok=True)
 	for i in range(batchsize):
