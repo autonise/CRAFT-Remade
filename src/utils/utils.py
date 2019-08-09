@@ -5,7 +5,44 @@ import train_synth.config as config
 import cv2
 import networkx as nx
 
+
+def weighing_function(orig_length, cur_length):
+
+	return (orig_length - min(orig_length, abs(orig_length - cur_length)))/orig_length
+
+
+def get_weighted_character_target(generated_targets, original_annotation, unkown_symbol):
+
+	"""return {
+		'word_bbox': np.array(join(all_characters, all_joins)),
+		'characters': np.copy(all_characters),
+		'joins': np.copy(all_joins),
+	}"""
+
+	"""
+	original_annotations -> {'bbox': [[4, 2]], 'text': []}
+	"""
+
+	weights = []
+
+	for no, gen_t in enumerate(generated_targets['word_bbox']):
+		found_no = -1
+		for orig_no, orig_annot in enumerate(original_annotation['bbox']):
+			if calc_iou(gen_t, orig_annot) > 0.5:
+				found_no = orig_no
+
+		if found_no == -1:
+			weights.append(0)
+		elif original_annotation['text'][found_no] == unkown_symbol:
+			weights.append(0)
+		else:
+			weights.append(weighing_function(len(original_annotation['text'][found_no]), generated_targets['characters'][no].shape[0]))
+
+	return weights
+
+
 def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_character, affinity_threshold=config.threshold_affinity):
+
 	assert weight.max() <= 1, 'Weight has not been normalised'
 	assert weight.min() >= 0, 'Weight has not been normalised'
 
@@ -21,42 +58,34 @@ def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_
 	weight = weight.astype(np.uint8)
 	weight_affinity = weight_affinity.astype(np.uint8)
 
-	word_bbox = []
-	characters = []
-	joins = []
-	
+	all_characters, hierarchy = cv2.findContours(weight, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+	all_joins, hierarchy = cv2.findContours(weight_affinity, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-	for i in range(weight.shape[0]):
+	if len(all_characters) > 1000:
 
-		all_characters, hierarchy = cv2.findContours(weight[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-		all_joins, hierarchy = cv2.findContours(weight_affinity[i], cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+		return {
+			'error_message': 'Number of characters too high'
+		}
 
-		
+	if len(all_joins) > 1000:
+		return {
+			'error_message': 'Number of characters too high'
+		}
 
-		if len(all_characters) > 1000:
-			word_bbox.append(np.zeros([0]))
-			continue
-		if len(all_joins) > 1000:
-			word_bbox.append(np.zeros([0]))
-			continue
+	for ii in range(len(all_characters)):
+		rect = cv2.minAreaRect(all_characters[ii])
+		all_characters[ii] = cv2.boxPoints(rect)
 
-		for ii in range(len(all_characters)):
-			rect = cv2.minAreaRect(all_characters[ii])
-			all_characters[ii] = cv2.boxPoints(rect)
+	for ii in range(len(all_joins)):
+		rect = cv2.minAreaRect(all_joins[ii])
+		all_joins[ii] = cv2.boxPoints(rect)
 
-		for ii in range(len(all_joins)):
-			rect = cv2.minAreaRect(all_joins[ii])
-			all_joins[ii] = cv2.boxPoints(rect)
+	return {
+		'word_bbox': np.array(join(all_characters, all_joins)),
+		'characters': np.copy(all_characters),
+		'joins': np.copy(all_joins),
+	}
 
-		characters.append(np.copy(all_characters))
-		joins.append(np.copy(all_joins))
-		word_bbox.append(np.array(join(all_characters, all_joins)))
-
-	to_return={}
-	to_return['word_bbox']=word_bbox
-	to_return['characters']=characters
-	to_return['joins']=joins
-	return 
 
 def order_points(pts):
 

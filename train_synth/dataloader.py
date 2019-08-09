@@ -3,9 +3,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
-import config
+import train_synth.config as config
+import json
 
 DEBUG = False
+
+sigma = 10
+spread = 3
+extent = int(spread * sigma)
+mult = 1.3
+center = spread * sigma * mult / 2
+gaussian_heatmap = np.zeros([int(extent*mult), int(extent*mult)], dtype=np.float32)
+
+for i in range(int(extent*mult)):
+	for j in range(int(extent*mult)):
+		gaussian_heatmap[i, j] = 1 / 2 / np.pi / (sigma ** 2) * np.exp(
+			-1 / 2 * ((i - center - 0.5) ** 2 + (j - center - 0.5) ** 2) / (sigma ** 2))
+
+gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
 
 
 def four_point_transform(image, pts):
@@ -32,11 +47,10 @@ def four_point_transform(image, pts):
 
 def resize(image, character, side=768):
 
-	#param image
-	#param character
-	#param side=length of the max_side of the image to be resize default=768
-	#return : np.array(side,side,3) containing the resize the image and the average values ,resize the character
-
+	# param image
+	# param character
+	# param side=length of the max_side of the image to be resize default=768
+	# return : np.array(side,side,3) containing the resize the image and the average values ,resize the character
 
 	height, width, channel = image.shape
 	max_side = max(height, width)
@@ -54,21 +68,6 @@ def resize(image, character, side=768):
 	character[1, :, :] += (side-image.shape[0])//2
 
 	return big_image, character
-
-
-sigma = 10
-spread = 3
-extent = int(spread * sigma)
-mult = 1.3
-center = spread * sigma * mult / 2
-gaussian_heatmap = np.zeros([int(extent*mult), int(extent*mult)], dtype=np.float32)
-
-for i in range(int(extent*mult)):
-	for j in range(int(extent*mult)):
-		gaussian_heatmap[i, j] = 1 / 2 / np.pi / (sigma ** 2) * np.exp(
-			-1 / 2 * ((i - center - 0.5) ** 2 + (j - center - 0.5) ** 2) / (sigma ** 2))
-
-gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
 
 
 def add_character(image, bbox):
@@ -92,8 +91,10 @@ def add_character(image, bbox):
 		start_col = max(top_left[0], 0) - top_left[0]
 		end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
 		end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
-		image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += transformed[start_row:end_row - top_left[1],
-		                                                                   start_col:end_col - top_left[0]]
+		image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+			transformed[
+			start_row:end_row - top_left[1],
+			start_col:end_col - top_left[0]]
 
 		return image
 
@@ -251,11 +252,46 @@ class DataLoaderEval(data.Dataset):
 		image = cv2.resize(image, new_reisze)
 
 		big_image = np.ones([768, 768, 3], dtype=np.float32) * np.mean(image)
-		big_image[(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
-		(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
+		big_image[
+			(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
+			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
 		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
 
-		return big_image.astype(np.float32), self.imnames[item]
+		return big_image.astype(np.float32), self.imnames[item], np.array([height, width])
+
+	def __len__(self):
+
+		return len(self.imnames)
+	
+	
+class DataLoaderEvalICDAR2013(data.Dataset):
+
+	def __init__(self, path):
+
+		self.base_path = config.ICDAR2013_path
+		with open(self.base_path+'/gt.json', 'r') as f:
+			self.gt = json.load(f)
+
+		self.imnames = sorted(self.gt['annots'].keys())
+		self.unknown = self.gt['unknown']
+
+	def __getitem__(self, item):
+
+		image = plt.imread(self.base_path+'/Images/'+self.imnames[item])
+		annots = self.gt['annots'][self.imnames[item]]
+
+		height, width, channel = image.shape
+		max_side = max(height, width)
+		new_reisze = (int(width / max_side * 768), int(height / max_side * 768))
+		image = cv2.resize(image, new_reisze)
+
+		big_image = np.ones([768, 768, 3], dtype=np.float32) * np.mean(image)
+		big_image[
+			(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
+			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
+		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
+
+		return big_image.astype(np.float32), self.imnames[item], np.array([height, width]), annots
 
 	def __len__(self):
 

@@ -1,14 +1,21 @@
+# ToDo -
+#   Pipeline -
+#   1)  Train on Synth-Text
+#   2)  Generate the target affinity, target character, weight mask for a specific dataset
+#   3)  Train the model on the predictions and some anchor Synth-Text model
+#   4)  Keep iterating step 2 and step 3
+
+
 def train(model, optimizer, iteration):
 
 	# ToDo - Read the paper again and note down the important points
-	# ToDo - Create the dataloader to create weighted mask for the
-	#  characters and also generate the target given the iterations
 
 	model.train()
 	optimizer.zero_grad()
 	iterator = tqdm(dataloader)
 
 	def change_lr(no):
+
 		#Change learning rate while training
 		for i in config.lr:
 			if i == no:

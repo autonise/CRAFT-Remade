@@ -41,7 +41,7 @@ def train_synth(mode, model=None, folder=None):
 				folder,
 				model_path=model,
 				base_path_character='/'.join(folder.split('/')[:-1])+'/target_character',
-				base_path_affinity='/'.join(folder.split('/')[:-1])+'/target_character')
+				base_path_affinity='/'.join(folder.split('/')[:-1])+'/target_affinity')
 	else:
 		print('Invalid Mode')
 
