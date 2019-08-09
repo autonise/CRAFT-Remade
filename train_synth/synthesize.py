@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 from src.utils.parallel import DataParallelModel
+import cv2
 
 DATA_DEBUG = False
 
@@ -26,13 +27,13 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character):
 		model.eval()
 		iterator = tqdm(dataloader)
 
-		for no, (image, image_name) in enumerate(iterator):
+		for no, (image, image_name, original_dim) in enumerate(iterator):
 
 			if DATA_DEBUG:
 				continue
 
 			if config.use_cuda:
-				image, weight, weight_affinity = image.cuda(), weight.cuda(), weight_affinity.cuda()
+				image = image.cuda()
 
 			output = model(image)
 
@@ -40,11 +41,18 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character):
 				output = torch.cat(output, dim=0)
 
 			output = output.data.cpu().numpy()
+			original_dim = original_dim.cpu().numpy()
 
 			for i in range(output.shape[0]):
 
-				character_bbox = output[i, 0, :, :]
-				affinity_bbox = output[i, 1, :, :]
+				max_dim = original_dim[i].max()
+				resizing_factor = 768/max_dim
+				before_pad_dim = [int(original_dim[i][0]*resizing_factor), int(original_dim[i][1]*resizing_factor)]
+
+				output[i, :, :, :] = np.uint8(output[i, :, :, :]*255)
+
+				character_bbox = cv2.resize(output[i, 0, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
+				affinity_bbox = cv2.resize(output[i, 1, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
 
 				plt.imsave(
 					base_path_character+'/'+'.'.join(image_name[i].split('.')[:-1])+'.png',
@@ -85,6 +93,7 @@ def main(folder_path, base_path_character=None, base_path_affinity=None, model_p
 
 	if model is None:
 		model = UNetWithResnet50Encoder()
+		model = DataParallelModel(model)
 
 		if config.use_cuda:
 			model = model.cuda()
@@ -121,6 +130,7 @@ def generator(folder_path, target_path, base_path_character=None, base_path_affi
 
 	if model is None:
 		model = UNetWithResnet50Encoder()
+		model = DataParallelModel(model)
 
 		if config.use_cuda:
 			model = model.cuda()

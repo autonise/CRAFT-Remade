@@ -1,11 +1,11 @@
-num_cuda = "0,1,2,3"
+num_cuda = "0,3"
 seed = 0
 save_path = '/home/SharedData/Mayank/Models/SYNTH'
 use_cuda = True
 
 batchsize = {
 	'train': 12,
-	'test': 1
+	'test': 6
 }
 
 DEBUG = False

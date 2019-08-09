@@ -227,11 +227,12 @@ class DataLoaderEval(data.Dataset):
 		image = cv2.resize(image, new_reisze)
 
 		big_image = np.ones([768, 768, 3], dtype=np.float32) * np.mean(image)
-		big_image[(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
-		(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
+		big_image[
+			(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
+			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
 		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
 
-		return big_image.astype(np.float32), self.imnames[item]
+		return big_image.astype(np.float32), self.imnames[item], np.array([height, width])
 
 	def __len__(self):
 
