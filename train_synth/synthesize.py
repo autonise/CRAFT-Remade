@@ -1,5 +1,6 @@
 import train_synth.config as config
 from src.model import UNetWithResnet50Encoder
+from src.utils.utils import calculate_batch_fscore
 from train_synth.dataloader import DataLoaderEval, DataLoaderEvalICDAR2013
 from torch.utils.data import DataLoader
 import torch
@@ -10,6 +11,7 @@ import matplotlib.pyplot as plt
 import random
 from src.utils.parallel import DataParallelModel
 from src.utils.utils import generate_bbox, get_weighted_character_target
+from shapely.geometry import box, Polygon
 import cv2
 import json
 
@@ -121,6 +123,9 @@ def synthesize_with_score(dataloader, model, base_target_path):
 
 				generated_targets['weights'] = get_weighted_character_target(generated_targets, original_annotations[i], dataloader.dataset.unknown)
 
+				f_score=calculate_batch_fscore(generated_targets,original_annotations[i])
+
+				dataloader.set_description(f_score)
 				with open(base_target_path + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.json', 'w') as f:
 					json.dump(generated_targets, f)
 
