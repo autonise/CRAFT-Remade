@@ -2,7 +2,7 @@ from .trainer import train
 from src.model import UNetWithResnet50Encoder
 import train_weak_supervision.config as config
 from train_synth.synthesize import generator
-
+from src.utils.parallel import DataParallelModel
 import torch
 
 
@@ -13,6 +13,8 @@ def get_initial_model_optimizer(path):
 	if config.use_cuda:
 		model = model.cuda()
 
+	model = DataParallelModel(model)
+
 	model.load_state_dict(torch.load(path)['state_dict'])
 
 	optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
@@ -22,9 +24,7 @@ def get_initial_model_optimizer(path):
 
 def generate_target(model, iteration):
 
-	generator(
-		config.images_path, base_path_character=config.character_path+'/'+str(iteration),
-		base_path_affinity=config.affinity_path+'/'+str(iteration), model=model)
+	generator(config.images_path, base_target_path=config.target_path+'/'+str(iteration), model=model)
 
 
 def save_model(model, optimizer, state, iteration=None):

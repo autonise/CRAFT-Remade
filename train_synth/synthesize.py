@@ -85,7 +85,13 @@ def synthesize_with_score(dataloader, model, base_target_path):
 		model.eval()
 		iterator = tqdm(dataloader)
 
-		for no, (image, image_name, original_dim, original_annotations) in enumerate(iterator):
+		for no, (image, image_name, original_dim, item) in enumerate(iterator):
+
+			annots = []
+
+			for i in item:
+				annot = dataloader.dataset.gt['annots'][dataloader.dataset.imnames[i]]
+				annots.append(annot)
 
 			if DATA_DEBUG:
 				continue
@@ -119,7 +125,9 @@ def synthesize_with_score(dataloader, model, base_target_path):
 					print('Error:', generated_targets['error_message'])
 					continue
 
-				generated_targets['weights'] = get_weighted_character_target(generated_targets, original_annotations[i], dataloader.dataset.unknown)
+				# ToDo - Incorporate that if weight < 0.5  or if word not detected then cut the bbox in equal parts
+
+				generated_targets = get_weighted_character_target(generated_targets, {'bbox': annots[i]['bbox'], 'text': annots[i]['text']}, dataloader.dataset.unknown)
 
 				with open(base_target_path + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.json', 'w') as f:
 					json.dump(generated_targets, f)
@@ -138,8 +146,8 @@ def main(folder_path, base_path_character=None, base_path_affinity=None, model_p
 	infer_dataloader = DataLoaderEval(folder_path)
 
 	infer_dataloader = DataLoader(
-		infer_dataloader, batch_size=16,
-		shuffle=True, num_workers=8)
+		infer_dataloader, batch_size=2,
+		shuffle=True, num_workers=2)
 
 	if model is None:
 		model = UNetWithResnet50Encoder()
@@ -156,8 +164,6 @@ def main(folder_path, base_path_character=None, base_path_affinity=None, model_p
 
 def generator(folder_path, base_target_path, model_path=None, model=None):
 
-	# ToDo - Create a dataloader which takes mixture of SYNTH and ICDAR2013 dataset
-	# ToDo - In the dataloader all the SYNTH text should have 100 percent confidence
 	# ToDo - Check if everything works in a iterative fashion
 
 	os.makedirs(base_target_path, exist_ok=True)
@@ -165,8 +171,8 @@ def generator(folder_path, base_target_path, model_path=None, model=None):
 	infer_dataloader = DataLoaderEvalICDAR2013(folder_path)
 
 	infer_dataloader = DataLoader(
-		infer_dataloader, batch_size=16,
-		shuffle=True, num_workers=8)
+		infer_dataloader, batch_size=2,
+		shuffle=True, num_workers=2)
 
 	if model is None:
 		model = UNetWithResnet50Encoder()

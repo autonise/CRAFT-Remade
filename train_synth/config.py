@@ -29,8 +29,8 @@ periodic_fscore = 100
 periodic_output = 1000
 periodic_save = 10000
 
-threshold_character = 0.5
-threshold_affinity = 0.5
+threshold_character = 0.4
+threshold_affinity = 0.4
 threshold_fscore = 0.5
 threshold_first_character = 0.5
 threshold_boundary = 0.5

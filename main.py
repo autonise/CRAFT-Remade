@@ -49,16 +49,19 @@ def train_synth(mode, model=None, folder=None):
 @main.command()
 @click.option('-model', '--model', help='Path to Model trained on SYNTH', required=True)
 @click.option('-iter', '--iterations', help='Number of Iterations to do', required=True)
-def weak_supervision(model, iter):
+def weak_supervision(model, iterations):
 
-	from train_weak_supervision.__init__ import get_initial_model, generate_target, train, save_model
+	from train_weak_supervision.__init__ import get_initial_model_optimizer, generate_target, train, save_model
 
 	model, optimizer = get_initial_model_optimizer(model)
 
-	for iteration in range(int(iter)):
+	for iteration in range(int(iterations)):
 
+		print('Generating for iteration:', iteration)
 		generate_target(model, iteration)
+		print('Fine-tuning for iteration:', iteration)
 		model, optimizer = train(model, optimizer, iteration)
+		print('Saving for iteration:', iteration)
 		save_model(model, optimizer, 'intermediate', iteration)
 
 	save_model(model, optimizer, 'final')

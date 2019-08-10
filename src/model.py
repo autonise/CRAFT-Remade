@@ -7,27 +7,62 @@ import numpy as np
 resnet = torchvision.models.resnet.resnet50(pretrained=True)
 
 
+def HNM(pred, target, weight=None):
+
+    cpu_target = target.data.cpu().numpy()
+    all_loss = F.mse_loss(pred, target, reduction='none')
+
+    positive = np.where(cpu_target != 0)[0]
+    negative = np.where(cpu_target == 0)[0]
+
+    if weight is not None:
+        positive_loss = all_loss[positive]*weight[positive]
+    else:
+        positive_loss = all_loss[positive]
+
+    negative_loss = all_loss[negative]
+
+    negative_loss_cpu = np.argsort(
+        -negative_loss.data.cpu().numpy())[0:min(min(1000, 4 * positive_loss.shape[0]), negative_loss.shape[0])]
+
+    return (positive_loss.sum() + negative_loss[negative_loss_cpu].sum()) / (
+                positive_loss.shape[0] + negative_loss_cpu.shape[0])
+
+
+class WeightedCriterian(nn.Module):
+
+    def __init__(self):
+
+        super(WeightedCriterian, self).__init__()
+
+    def forward(self, output, character_map, affinity_map, character_weight, affinity_weight):
+
+        batchsize, channels, height, width = output.shape
+
+        output = output.permute(0, 2, 3, 1).contiguous().view([batchsize * height * width, channels])
+
+        character = output[:, 0]
+        affinity = output[:, 1]
+
+        affinity_map = affinity_map.view([batchsize * height * width])
+        character_map = character_map.view([batchsize * height * width])
+
+        character_weight = character_weight.view([batchsize * height * width])
+        affinity_weight = affinity_weight.view([batchsize * height * width])
+
+        loss_character = HNM(character, character_map, character_weight)
+        loss_affinity = HNM(affinity, affinity_map, affinity_weight)
+
+        all_loss = loss_character + loss_affinity
+
+        return all_loss
+
+
 class Criterian(nn.Module):
 
     def __init__(self):
 
         super(Criterian, self).__init__()
-
-    def HNM(self, pred, target):
-
-        cpu_target = target.data.cpu().numpy()
-        all_loss = F.mse_loss(pred, target, reduction='none')
-
-        positive = np.where(cpu_target != 0)[0]
-        negative = np.where(cpu_target == 0)[0]
-
-        positive_loss = all_loss[positive]
-        negative_loss = all_loss[negative]
-
-        negative_loss_cpu = np.argsort(
-            -negative_loss.data.cpu().numpy())[0:min(min(1000, 4*positive_loss.shape[0]), negative_loss.shape[0])]
-
-        return (positive_loss.sum() + negative_loss[negative_loss_cpu].sum())/(positive_loss.shape[0] + negative_loss_cpu.shape[0])
 
     def forward(self, output, weight, weight_affinity):
 
@@ -41,8 +76,8 @@ class Criterian(nn.Module):
         weight_affinity = weight_affinity.view([batchsize * height * width])
         weight = weight.view([batchsize * height * width])
 
-        loss_character = self.HNM(character, weight)
-        loss_affinity = self.HNM(affinity, weight_affinity)
+        loss_character = HNM(character, weight)
+        loss_affinity = HNM(affinity, weight_affinity)
 
         all_loss = loss_character + loss_affinity
 

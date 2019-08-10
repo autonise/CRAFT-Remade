@@ -3,25 +3,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
-import train_synth.config as config
+import train_weak_supervision.config as config
 import json
-from train_synth.dataloader import resize, generate_affinity, generate_target
+from train_synth.dataloader import resize, resize_generated, generate_affinity, generate_target, generate_target_others, generate_affinity_others
 
 
-DEBUG = False
+DEBUG = True
 
 
 class DataLoaderMIX(data.Dataset):
 
-	def __init__(self, type_, path_gen):
+	def __init__(self, type_, iteration):
 
 		self.type_ = type_
 		self.base_path_synth = config.DataLoaderSYNTH_base_path
 		self.base_path_other_images = config.ICDAR2013_path+'/Images'
-		self.base_path_other_gt = path_gen
+		self.base_path_other_gt = config.ICDAR2013_path+'/Generated/'+str(iteration)
 
 		if DEBUG:
-			import os
 			if not os.path.exists('cache.pkl'):
 				with open('cache.pkl', 'wb') as f:
 					import pickle
@@ -62,27 +61,36 @@ class DataLoaderMIX(data.Dataset):
 				all_words += [k for k in ' '.join(j.split('\n')).split() if k!='']
 			self.txt[no] = all_words
 
-		with open(self.base_path_other_gt, 'r') as f:
-			self.gt = json.load(f)
+		self.gt = []
 
-		# ToDo - get the character_bbox, affinity_bbox, weights corresponding to each image from self.gt
+		for i in sorted(os.listdir(self.base_path_other_gt)):
+			with open(self.base_path_other_gt+'/'+i, 'r') as f:
+				self.gt.append(['.'.join(i.split('.')[:-1]) + '.jpg', json.load(f)])
 
 	def __getitem__(self, item):
 
-		# ToDo - random choice between Synth and other dataset
+		if np.random.uniform() < config.prob_synth:
 
-		image = plt.imread(self.base_path_synth+'/'+self.imnames[item][0])
-		image, character = resize(image, self.charBB[item].copy())
-		image = image.transpose(2, 0, 1)/255
-		weight = generate_target(image.shape, character.copy())
-		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())
+			image = plt.imread(self.base_path_synth+'/'+self.imnames[item][0])
+			image, character = resize(image, self.charBB[item].copy())
+			image = image.transpose(2, 0, 1)/255
+			weight_character, weak_supervision_char = generate_target(image.shape, character.copy(), weight=1)
+			weight_affinity, weak_supervision_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy(), weight=1)
 
-		# ToDo - write function to generate ground truth for other dataset
+		else:
 
-		# ToDo - pass weights for each word bbox also
+			image = plt.imread(self.base_path_other_images+'/'+self.gt[item % len(self.gt)][0])
+			character = self.gt[item % len(self.gt)][1]['characters']
+			image, character = resize_generated(image, character.copy())
+			image = image.transpose(2, 0, 1) / 255
+			weights = [i for i in self.gt[item % len(self.gt)][1]['weights']]
 
-		return image.astype(np.float32), weight.astype(np.float32), weight_affinity.astype(np.float32)
+			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights)
+			weight_affinity, weak_supervision_affinity = generate_affinity_others(image.shape, character.copy(), self.gt[item % len(self.gt)][1]['text'], weights)
+
+		return image.astype(np.float32), weight_character.astype(np.float32), weight_affinity.astype(np.float32), \
+				weak_supervision_char.astype(np.float32), weak_supervision_affinity.astype(np.float32)
 
 	def __len__(self):
 
-		return len(self.imnames)
+		return config.iterations

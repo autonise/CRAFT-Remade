@@ -9,7 +9,7 @@ from shutil import copyfile
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-import config
+import train_synth.config as config
 
 from src.utils.parallel import DataParallelModel, DataParallelCriterion
 from src.utils.utils import calculate_batch_fscore, get_word_poly

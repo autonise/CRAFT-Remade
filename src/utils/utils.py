@@ -8,40 +8,89 @@ import networkx as nx
 
 def weighing_function(orig_length, cur_length):
 
+	"""
+
+	:param orig_length: Length of the expected word bounding box
+	:param cur_length: Length of the predicted word bounding box
+	:return:
+	"""
+
 	return (orig_length - min(orig_length, abs(orig_length - cur_length)))/orig_length
 
 
 def get_weighted_character_target(generated_targets, original_annotation, unkown_symbol):
 
-	"""return {
-		'word_bbox': np.array(join(all_characters, all_joins)),
-		'characters': np.copy(all_characters),
-		'joins': np.copy(all_joins),
-	}"""
-
-	"""
-	original_annotations -> {'bbox': [[4, 2]], 'text': []}
 	"""
 
-	weights = []
+	:param generated_targets: {
+			'word_bbox': np.array(join(all_characters, all_joins)),
+			'characters': np.copy(all_characters),
+		}
+	:param original_annotation: {'bbox': [[4, 2]], 'text': []}
+	:param unkown_symbol: The symbol(string) which denotes that the text was not annotated
+	:return:
+	"""
 
-	for no, gen_t in enumerate(generated_targets['word_bbox']):
+	aligned_generated_targets = {
+		'word_bbox': original_annotation['bbox'],
+		'characters': [[] for i in original_annotation['text']],
+		'text': original_annotation['text'],
+		'weights': [0 for i in original_annotation['text']]
+	}
+
+	for orig_no, orig_annot in enumerate(original_annotation['bbox']):
+
 		found_no = -1
-		for orig_no, orig_annot in enumerate(original_annotation['bbox']):
-			if calc_iou(gen_t, orig_annot) > 0.5:
-				found_no = orig_no
+
+		for no, gen_t in enumerate(generated_targets['word_bbox']):
+
+			if calc_iou(np.array(gen_t), np.array(orig_annot)) > 0.5:
+				found_no = no
+				break
 
 		if found_no == -1:
-			weights.append(0)
-		elif original_annotation['text'][found_no] == unkown_symbol:
-			weights.append(0)
-		else:
-			weights.append(weighing_function(len(original_annotation['text'][found_no]), generated_targets['characters'][no].shape[0]))
+			# ToDo - Write the code for breaking the word_bbox in equal parts and
+			#  appending to the aligned_generated_targets['characters']
 
-	return weights
+			aligned_generated_targets['weights'][orig_no] = 0.5
+		elif original_annotation['text'][found_no] == unkown_symbol:
+
+			aligned_generated_targets['weights'][orig_no] = 0.5
+			for i in generated_targets['characters'][found_no]:
+				aligned_generated_targets['characters'][orig_no].append(i)
+		else:
+			aligned_generated_targets['weights'][orig_no] = weighing_function(len(original_annotation['text'][found_no]), len(generated_targets['characters'][no]))
+			for i in generated_targets['characters'][found_no]:
+				aligned_generated_targets['characters'][orig_no].append(i)
+
+	return aligned_generated_targets
+
+
+def remove_small_predictions(image):
+
+	"""
+
+	:param image: Predicted character or affinity heat map in uint8
+	:return:
+	"""
+
+	kernel = np.ones((5, 5), np.uint8)
+	image = cv2.erode(image, kernel, iterations=2)
+	image = cv2.dilate(image, kernel, iterations=3)
+
+	return image
 
 
 def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_character, affinity_threshold=config.threshold_affinity):
+
+	"""
+
+	:param weight: Character Heatmap (Range between 0 and 1)
+	:param weight_affinity: Affinity Heatmap (Range between 0 and 1)
+	:param character_threshold: Threshold above which we say pixel belongs to a character
+	:param affinity_threshold: Threshold above which we say a pixel belongs to a affinity
+	:return:
+	"""
 
 	assert weight.max() <= 1, 'Weight has not been normalised'
 	assert weight.min() >= 0, 'Weight has not been normalised'
@@ -57,6 +106,9 @@ def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_
 
 	weight = weight.astype(np.uint8)
 	weight_affinity = weight_affinity.astype(np.uint8)
+
+	weight = remove_small_predictions(weight)
+	weight_affinity = remove_small_predictions(weight_affinity)
 
 	all_characters, hierarchy = cv2.findContours(weight, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 	all_joins, hierarchy = cv2.findContours(weight_affinity, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -80,14 +132,23 @@ def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_
 		rect = cv2.minAreaRect(all_joins[ii])
 		all_joins[ii] = cv2.boxPoints(rect)
 
+	all_word_bbox, all_characters_bbox = join_with_characters(all_characters, all_joins)
+	word_bbox = [i.tolist() for i in np.array(all_word_bbox)]
+	char_bbox = [i.tolist() for i in np.array(all_characters_bbox)]
+
 	return {
-		'word_bbox': np.array(join(all_characters, all_joins)),
-		'characters': np.copy(all_characters),
-		'joins': np.copy(all_joins),
+		'word_bbox': word_bbox,
+		'characters': char_bbox
 	}
 
 
 def order_points(pts):
+
+	"""
+	Orders the 4 co-ordinates of a bounding box
+	:param pts: numpy array with shape [4, 2]
+	:return:
+	"""
 
 	rect = np.zeros((4, 2), dtype="float32")
 	s = pts.sum(axis=1)
@@ -102,6 +163,13 @@ def order_points(pts):
 
 def calc_iou(poly1, poly2):
 
+	"""
+
+	:param poly1: numpy array containing co-ordinates with shape [num_points, 1, 2] or [num_points, 2]
+	:param poly2: numpy array containing co-ordinates with shape [num_points, 1, 2] or [num_points, 2]
+	:return:
+	"""
+
 	a = Polygon(poly1.reshape([poly1.shape[0], 2]))
 	b = Polygon(poly2.reshape([poly2.shape[0], 2]))
 
@@ -114,6 +182,16 @@ def calc_iou(poly1, poly2):
 
 
 def calculate_fscore(pred, target, text_pred=None, text_target=None, threshold=0.5):
+
+	"""
+
+	:param pred: numpy array with shape [num_words, 4, 2]
+	:param target: numpy array with shape [num_words, 4, 2]
+	:param text_pred: predicted text (Not useful in CRAFT implementation)
+	:param text_target: target text (Not useful in CRAFT implementation)
+	:param threshold: overlap iou threshold over which we say the pair is positive
+	:return:
+	"""
 
 	if text_pred is None:
 		check_text = False
@@ -159,6 +237,16 @@ def calculate_fscore(pred, target, text_pred=None, text_target=None, threshold=0
 
 def calculate_batch_fscore(pred, target, text_pred=None, text_target=None, threshold=0.5):
 
+	"""
+
+	:param pred: list of numpy array having shape [num_words, 4, 2]
+	:param target: list of numpy array having shape [num_words, 4, 2]
+	:param text_pred: list of predicted text
+	:param text_target: list of target text
+	:param threshold: threshold value for iou above which we say a pair of bbox are positive
+	:return:
+	"""
+
 	f_score = 0
 	for i in range(len(pred)):
 		if text_pred is not None:
@@ -177,7 +265,7 @@ def calculate_batch_fscore(pred, target, text_pred=None, text_target=None, thres
 def get_smooth_polygon(word_contours):
 
 	"""
-	:param word_contours:   Contours to be joined to get one word in order(The contours are consecutive)
+	:param word_contours: Contours to be joined to get one word in order(The contours are consecutive)
 	:return:
 	"""
 
@@ -191,6 +279,13 @@ def get_smooth_polygon(word_contours):
 
 
 def join(characters, joints):
+
+	"""
+
+	:param characters: list of character bbox
+	:param joints: list of join(affinity) bbox
+	:return:
+	"""
 
 	all_joined = characters + joints
 
@@ -214,7 +309,52 @@ def join(characters, joints):
 	return all_word_contours
 
 
+def join_with_characters(characters, joints):
+
+	"""
+
+	:param characters: list of character bbox
+	:param joints: list of join(affinity) bbox
+	:return:
+	"""
+
+	all_joined = characters + joints
+
+	all_joined = np.array(all_joined).reshape([len(all_joined), 4, 2])
+
+	graph = nx.Graph()
+	graph.add_nodes_from(nx.path_graph(all_joined.shape[0]))
+
+	for contour_i in range(all_joined.shape[0]-1):
+		for contour_j in range(contour_i+1, all_joined.shape[0]):
+			value = Polygon(all_joined[contour_i]).intersection(Polygon(all_joined[contour_j])).area
+			if value > 0:
+				graph.add_edge(contour_i, contour_j)
+
+	all_words = nx.connected_components(graph)
+	all_word_contours = []
+	all_character_contours = []
+
+	for word_idx in all_words:
+		if len(all_joined[np.array(list(word_idx))[list(np.where(np.array(list(word_idx)) < len(characters)))[0]]]) == 0:
+			continue
+
+		all_word_contours.append(get_smooth_polygon(all_joined[list(word_idx)]))
+		all_character_contours.append(all_joined[np.array(list(word_idx))[list(np.where(np.array(list(word_idx)) < len(characters)))[0]]])
+
+	return all_word_contours, all_character_contours
+
+
 def get_word_poly(weight, weight_affinity, character_threshold=config.threshold_character, affinity_threshold=config.threshold_affinity):
+
+	"""
+
+	:param weight: heatmap of characters
+	:param weight_affinity: heatmap of affinity
+	:param character_threshold: threshold above which we say a pixel is character
+	:param affinity_threshold: threshold above which we say a pixel is affinity
+	:return:
+	"""
 
 	assert weight.max() <= 1, 'Weight has not been normalised'
 	assert weight.min() >= 0, 'Weight has not been normalised'
@@ -256,19 +396,3 @@ def get_word_poly(weight, weight_affinity, character_threshold=config.threshold_
 		word_bbox.append(np.array(join(all_characters, all_joins)))
 
 	return word_bbox
-
-
-if __name__ == "__main__":
-
-	import matplotlib.pyplot as plt
-
-	affinity = plt.imread('/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/train_synthesis/0_1/0/target_affinity.png')[:, :, 0][None, :, :]
-	character = plt.imread('/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/train_synthesis/0_1/0/target_characters.png')[:, :, 0][None, :, :]
-
-	image = plt.imread('/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/train_synthesis/0_1/0/image.png')[:, :, 0:3]*255
-	image = image.astype(np.uint8)
-
-	word_bbox = get_word_poly(character, affinity)
-	cv2.drawContours(image, word_bbox[0], -1, (0, 255, 0), 3)
-
-	plt.imsave('out.png', image)

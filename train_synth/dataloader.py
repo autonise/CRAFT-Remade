@@ -70,6 +70,33 @@ def resize(image, character, side=768):
 	return big_image, character
 
 
+def resize_generated(image, character, side=768):
+
+	# param image
+	# param character
+	# param side=length of the max_side of the image to be resize default=768
+	# return : np.array(side,side,3) containing the resize the image and the average values ,resize the character
+
+	height, width, channel = image.shape
+	max_side = max(height, width)
+	new_reisze = (int(width/max_side*side), int(height/max_side*side))
+	image = cv2.resize(image, new_reisze)
+
+	for i in range(len(character)):
+		character[i][0, :, :] = character[i][0, :, :]/width*new_reisze[0]
+		character[i][1, :, :] = character[i][1, :, :]/height*new_reisze[1]
+
+	big_image = np.ones([side, side, 3], dtype=np.float32)*np.mean(image)
+	big_image[(side-image.shape[0])//2: (side-image.shape[0])//2 + image.shape[0], (side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
+	big_image = big_image.astype(np.uint8)
+
+	for i in range(len(character)):
+		character[i][0, :, :] += (side-image.shape[1])//2
+		character[i][1, :, :] += (side-image.shape[0])//2
+
+	return big_image, character
+
+
 def add_character(image, bbox):
 
 	# param image:
@@ -103,6 +130,44 @@ def add_character(image, bbox):
 		return backup
 
 
+def add_character_others(image, weight_map, weight_val, bbox):
+
+	# param image:
+	# param bbox:co-ordinates of the bounding-box
+	# function:generate the transformed 2d gausian heatmap for the region score
+	# return : the modified image
+
+	backup = (image.copy(), weight_map.copy())
+
+	try:
+
+		top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
+		if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
+			return image, weight_map
+		bbox -= top_left[None, :]
+		transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32))
+
+		start_row = max(top_left[1], 0) - top_left[1]
+		start_col = max(top_left[0], 0) - top_left[0]
+		end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
+		end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
+		image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+			transformed[
+			start_row:end_row - top_left[1],
+			start_col:end_col - top_left[0]]
+
+		weight_map[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+			np.float32(transformed[
+			start_row:end_row - top_left[1],
+			start_col:end_col - top_left[0]] != 0)*weight_val
+
+		return image, weight_map
+
+	except:
+
+		return backup
+
+
 def add_affinity(image, bbox_1, bbox_2):
 
 	# param image 
@@ -130,7 +195,34 @@ def add_affinity(image, bbox_1, bbox_2):
 		return backup
 
 
-def generate_target(image_size, character_bbox):
+def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
+
+	# param image
+	# param bbox1=coordinates of the first bounding box
+	# param bbox2=coordinates of the second bounding box
+	# function:- generate an affinity box using bbox1 and bbox2
+	# return func
+
+	backup = image.copy(), weight.copy()
+
+	try:
+
+		center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
+		tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
+		bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
+		tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
+		br = np.mean([bbox_2[2], bbox_2[3], center_2], axis=0)
+
+		affinity = np.array([tl, tr, br, bl])
+
+		return add_character_others(image, weight, weight_val, affinity)
+
+	except:
+
+		return backup
+
+
+def generate_target(image_size, character_bbox, weight=None):
 
 	character_bbox = character_bbox.transpose(2, 1, 0)
 
@@ -142,10 +234,29 @@ def generate_target(image_size, character_bbox):
 
 		target = add_character(target, character_bbox[i].copy())
 
-	return target/255
+	if weight is not None:
+		return target/255, np.float32(target != 0)
+	else:
+		return target/255
 
 
-def generate_affinity(image_size, character_bbox, text):
+def generate_target_others(image_size, character_bbox, weight):
+
+	channel, height, width = image_size
+
+	target = np.zeros([height, width], dtype=np.uint8)
+	weight_map = np.zeros([height, width], dtype=np.float32)
+
+	for word_no in range(len(character_bbox)):
+
+		for i in range(character_bbox[word_no].shape[0]):
+
+			target, weight_map = add_character_others(target, weight_map, weight[word_no], character_bbox[word_no][i].copy())
+
+	return target/255, weight_map
+
+
+def generate_affinity(image_size, character_bbox, text, weight=None):
 
 	"""
 
@@ -169,7 +280,41 @@ def generate_affinity(image_size, character_bbox, text):
 			total_letters += 1
 		total_letters += 1
 
-	return target / 255
+	if weight is not None:
+
+		return target / 255, np.float32(target != 0)
+
+	else:
+
+		return target / 255
+
+
+def generate_affinity_others(image_size, character_bbox, text, weight):
+
+	"""
+
+	:param image_size: shape = [3, image_height, image_width]
+	:param character_bbox: [2, 4, num_characters]
+	:param text: [num_words]
+	:return:
+	"""
+
+	channel, height, width = image_size
+
+	target = np.zeros([height, width], dtype=np.uint8)
+	weight_map = np.zeros([height, width], dtype=np.float32)
+
+	print(len(weight), character_bbox.shape, text)
+
+	for i, word in enumerate(character_bbox):
+
+		for char_num in range(len(word)-1):
+			weight[i]
+			word[char_num]
+			word[char_num+1]
+			target, weight_map = add_affinity_others(target, weight_map, weight[i], word[char_num].copy(), word[char_num+1].copy())
+
+	return target/255, weight_map
 
 
 class DataLoaderSYNTH(data.Dataset):
@@ -278,7 +423,6 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 	def __getitem__(self, item):
 
 		image = plt.imread(self.base_path+'/Images/'+self.imnames[item])
-		annots = self.gt['annots'][self.imnames[item]]
 
 		height, width, channel = image.shape
 		max_side = max(height, width)
@@ -291,7 +435,7 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
 		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
 
-		return big_image.astype(np.float32), self.imnames[item], np.array([height, width]), annots
+		return big_image.astype(np.float32), self.imnames[item], np.array([height, width]), item
 
 	def __len__(self):
 
