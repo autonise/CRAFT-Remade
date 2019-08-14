@@ -1,6 +1,7 @@
 import click
 import os
 
+
 @click.group()
 def main():
 	pass
@@ -52,6 +53,8 @@ def train_synth(mode, model=None, folder=None):
 def weak_supervision(model, iterations):
 
 	from train_weak_supervision.__init__ import get_initial_model_optimizer, generate_target, train, save_model
+	from train_synth import synthesize
+	from train_weak_supervision import config
 
 	model, optimizer = get_initial_model_optimizer(model)
 

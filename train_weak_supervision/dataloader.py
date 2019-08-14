@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 from torch.utils import data
 import matplotlib.pyplot as plt
 import numpy as np
@@ -5,6 +6,8 @@ import cv2
 import os
 import train_weak_supervision.config as config
 import json
+
+from train_synth import config as config
 from train_synth.dataloader import resize, resize_generated, generate_affinity, generate_target, generate_target_others, generate_affinity_others
 
 
@@ -86,7 +89,7 @@ class DataLoaderMIX(data.Dataset):
 			weights = [i for i in self.gt[item % len(self.gt)][1]['weights']]
 
 			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights)
-			weight_affinity, weak_supervision_affinity = generate_affinity_others(image.shape, character.copy(), self.gt[item % len(self.gt)][1]['text'], weights)
+			weight_affinity, weak_supervision_affinity = generate_affinity_others(image.shape, character.copy(), weights)
 
 		return image.astype(np.float32), weight_character.astype(np.float32), weight_affinity.astype(np.float32), \
 				weak_supervision_char.astype(np.float32), weak_supervision_affinity.astype(np.float32)
@@ -94,3 +97,36 @@ class DataLoaderMIX(data.Dataset):
 	def __len__(self):
 
 		return config.iterations
+
+
+class DataLoaderEvalICDAR2013(data.Dataset):
+
+	def __init__(self, path):
+
+		self.base_path = config.ICDAR2013_path
+		with open(self.base_path+'/gt.json', 'r') as f:
+			self.gt = json.load(f)
+
+		self.imnames = sorted(self.gt['annots'].keys())
+		self.unknown = self.gt['unknown']
+
+	def __getitem__(self, item):
+
+		image = plt.imread(self.base_path+'/Images/'+self.imnames[item])
+
+		height, width, channel = image.shape
+		max_side = max(height, width)
+		new_reisze = (int(width / max_side * 768), int(height / max_side * 768))
+		image = cv2.resize(image, new_reisze)
+
+		big_image = np.ones([768, 768, 3], dtype=np.float32) * np.mean(image)
+		big_image[
+			(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
+			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
+		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
+
+		return big_image.astype(np.float32), self.imnames[item], np.array([height, width]), item
+
+	def __len__(self):
+
+		return len(self.imnames)

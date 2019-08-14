@@ -1,11 +1,15 @@
-##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-## Created by: Hang Zhang, Rutgers University, Email: zhang.hang@rutgers.edu
-## Modified by Thomas Wolf, HuggingFace Inc., Email: thomas@huggingface.co
-## Copyright (c) 2017-2018
-##
-## This source code is licensed under the MIT-style license found in the
-## LICENSE file in the root directory of this source tree
-##+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# I have used this code directly from somewhere I forgot to keep track of. This is a better DataParallel module
+# provided than pytorch's inbuilt torch.nn.DataParallel. The gradients are also calculated in parallel which does does
+# not happen in the native implementation of pytorch's DataParallel where the gradients are calculated on GPU-0
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Created by: Hang Zhang, Rutgers University, Email: zhang.hang@rutgers.edu
+# Modified by Thomas Wolf, HuggingFace Inc., Email: thomas@huggingface.co
+# Copyright (c) 2017-2018
+#
+# This source code is licensed under the MIT-style license found in the
+# LICENSE file in the root directory of this source tree
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 """Encoding Data Parallel"""
 import threading
@@ -15,19 +19,20 @@ from torch.autograd import Variable, Function
 import torch.cuda.comm as comm
 from torch.nn.parallel.data_parallel import DataParallel
 from torch.nn.parallel.parallel_apply import get_a_var
-from torch.nn.parallel.scatter_gather import gather
-from torch.nn.parallel._functions import ReduceAddCoalesced, Broadcast
+from torch.nn.parallel._functions import Broadcast
 from torch.nn.parallel.distributed import DistributedDataParallel
 torch_ver = torch.__version__[:3]
 
 __all__ = ['allreduce', 'DataParallelModel', 'DataParallelCriterion',
            'patch_replication_callback']
 
+
 def allreduce(*inputs):
     """Cross GPU all reduce autograd operation for calculate mean and
     variance in SyncBN.
     """
     return AllReduce.apply(*inputs)
+
 
 class AllReduce(Function):
     @staticmethod

@@ -2,8 +2,17 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="119932cc-1b58-48ee-bc3e-1c17fe5770fd" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/mayank.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/mayank.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/data_structure.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/data_structure.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/parallel.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/parallel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/running_mean.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/running_mean.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/utils/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/visualise_generated.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/train_synth/__init__.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/train_synth/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_synth/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/dataloader.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_synth/synthesize.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/synthesize.py" afterDir="false" />

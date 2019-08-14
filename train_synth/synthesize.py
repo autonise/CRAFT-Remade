@@ -1,6 +1,7 @@
 import train_synth.config as config
 from src.model import UNetWithResnet50Encoder
-from train_synth.dataloader import DataLoaderEval, DataLoaderEvalICDAR2013
+from train_synth.dataloader import DataLoaderEval
+from train_weak_supervision.dataloader import DataLoaderEvalICDAR2013
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
@@ -9,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 from src.utils.parallel import DataParallelModel
-from src.utils.utils import generate_bbox, get_weighted_character_target
+from src.utils.utils import generate_word_bbox, get_weighted_character_target
 import cv2
 import json
 
@@ -18,7 +19,7 @@ DATA_DEBUG = False
 
 if DATA_DEBUG:
 	config.num_cuda = '0'
-	config.batchsize['test'] = 1
+	config.batch_size['test'] = 1
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
@@ -113,12 +114,15 @@ def synthesize_with_score(dataloader, model, base_target_path):
 				resizing_factor = 768/max_dim
 				before_pad_dim = [int(original_dim[i][0]*resizing_factor), int(original_dim[i][1]*resizing_factor)]
 
+				plt.imsave(base_target_path + '_affinity'+'/'+'.'.join(image_name[i].split('.')[:-1])+'.png', np.float32(output[i, 1, :, :] > config.threshold_affinity), cmap='gray')
+				plt.imsave(base_target_path + '_character'+'/'+'.'.join(image_name[i].split('.')[:-1])+'.png', np.float32(output[i, 0, :, :] > config.threshold_character), cmap='gray')
+
 				output[i, :, :, :] = np.uint8(output[i, :, :, :]*255)
 
 				character_bbox = cv2.resize(output[i, 0, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
 				affinity_bbox = cv2.resize(output[i, 1, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
 
-				generated_targets = generate_bbox(
+				generated_targets = generate_word_bbox(
 					character_bbox, affinity_bbox,
 					character_threshold=config.threshold_character,
 					affinity_threshold=config.threshold_affinity)
@@ -128,7 +132,10 @@ def synthesize_with_score(dataloader, model, base_target_path):
 					print('Error:', generated_targets['error_message'])
 					continue
 
-				generated_targets = get_weighted_character_target(generated_targets, {'bbox': annots[i]['bbox'], 'text': annots[i]['text']}, dataloader.dataset.unknown)
+				generated_targets = get_weighted_character_target(
+					generated_targets, {'bbox': annots[i]['bbox'], 'text': annots[i]['text']},
+					dataloader.dataset.unknown,
+					config.threshold_fscore)
 
 				with open(base_target_path + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.json', 'w') as f:
 					json.dump(generated_targets, f)
@@ -166,6 +173,8 @@ def main(folder_path, base_path_character=None, base_path_affinity=None, model_p
 def generator(folder_path, base_target_path, model_path=None, model=None):
 
 	os.makedirs(base_target_path, exist_ok=True)
+	os.makedirs(base_target_path+'_affinity', exist_ok=True)
+	os.makedirs(base_target_path+'_character', exist_ok=True)
 
 	infer_dataloader = DataLoaderEvalICDAR2013(folder_path)
 

@@ -12,13 +12,13 @@ import random
 import train_synth.config as config
 
 from src.utils.parallel import DataParallelModel, DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, get_word_poly
+from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch
 
 DATA_DEBUG = False
 
 if DATA_DEBUG:
 	config.num_cuda = '0'
-	config.batchsize['train'] = 1
+	config.batch_size['train'] = 1
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
@@ -115,12 +115,12 @@ def train(dataloader, lossCriterian, model, optimizer, STARTING_NO, epoch=0, all
 			if no % config.periodic_fscore == 0 and no != 0:
 				if type(output) == list:
 					output = torch.cat(output, dim=0)
-				predicted_bbox = get_word_poly(
+				predicted_bbox = generate_word_bbox_batch(
 					output[:, 0, :, :].data.cpu().numpy(),
 					output[:, 1, :, :].data.cpu().numpy(),
 					character_threshold=config.threshold_character,
 					affinity_threshold=config.threshold_affinity)
-				target_bbox = get_word_poly(
+				target_bbox = generate_word_bbox_batch(
 					weight.data.cpu().numpy(),
 					weight_affinity.data.cpu().numpy(),
 					character_threshold=config.threshold_character,
@@ -179,7 +179,7 @@ def main():
 		model = model.cuda()
 
 	train_dataloader = DataLoader(
-		train_dataloader, batch_size=config.batchsize['train'],
+		train_dataloader, batch_size=config.batch_size['train'],
 		shuffle=True, num_workers=24)
 
 	optimizer = torch.optim.Adam(model.parameters(), lr=config.lr[1])

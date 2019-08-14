@@ -1,12 +1,32 @@
 <component name="ProjectDictionaryState">
   <dictionary name="mayank">
     <words>
+      <w>annot</w>
+      <w>annots</w>
+      <w>bilinear</w>
+      <w>conv</w>
       <w>criterian</w>
       <w>cuda</w>
       <w>dataloader</w>
+      <w>dataset</w>
+      <w>dtype</w>
+      <w>equi</w>
+      <w>fscore</w>
+      <w>heatmap</w>
+      <w>icdar</w>
       <w>imnames</w>
+      <w>mayank</w>
+      <w>mult</w>
+      <w>ohnm</w>
       <w>pred</w>
+      <w>pretrained</w>
+      <w>pytorch</w>
+      <w>resnet</w>
       <w>synth</w>
+      <w>thresholded</w>
+      <w>uint</w>
+      <w>upsample</w>
+      <w>upsampling</w>
     </words>
   </dictionary>
 </component>

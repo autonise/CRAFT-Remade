@@ -17,7 +17,7 @@ def get_initial_model_optimizer(path):
 
 	model.load_state_dict(torch.load(path)['state_dict'])
 
-	optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+	optimizer = torch.optim.Adam(model.parameters(), lr=config.lr[1])
 
 	return model, optimizer
 

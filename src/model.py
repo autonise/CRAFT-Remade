@@ -4,10 +4,17 @@ import torch
 from torch.nn import functional as F
 import numpy as np
 
-resnet = torchvision.models.resnet.resnet50(pretrained=True)
 
+def hard_negative_mining(pred, target, weight=None):
 
-def HNM(pred, target, weight=None):
+    """
+    Online hard mining on the entire batch
+
+    :param pred: predicted character or affinity heat map, torch.cuda.FloatTensor, shape = [num_pixels]
+    :param target: target character or affinity heat map, torch.cuda.FloatTensor, shape = [num_pixels]
+    :param weight: If weight is not None, it denotes the weight given to each pixel for weak-supervision training
+    :return: Online Hard Negative Mining loss
+    """
 
     cpu_target = target.data.cpu().numpy()
     all_loss = F.mse_loss(pred, target, reduction='none')
@@ -29,55 +36,46 @@ def HNM(pred, target, weight=None):
                 positive_loss.shape[0] + negative_loss_cpu.shape[0])
 
 
-class WeightedCriterian(nn.Module):
-
-    def __init__(self):
-
-        super(WeightedCriterian, self).__init__()
-
-    def forward(self, output, character_map, affinity_map, character_weight, affinity_weight):
-
-        batchsize, channels, height, width = output.shape
-
-        output = output.permute(0, 2, 3, 1).contiguous().view([batchsize * height * width, channels])
-
-        character = output[:, 0]
-        affinity = output[:, 1]
-
-        affinity_map = affinity_map.view([batchsize * height * width])
-        character_map = character_map.view([batchsize * height * width])
-
-        character_weight = character_weight.view([batchsize * height * width])
-        affinity_weight = affinity_weight.view([batchsize * height * width])
-
-        loss_character = HNM(character, character_map, character_weight)
-        loss_affinity = HNM(affinity, affinity_map, affinity_weight)
-
-        all_loss = loss_character + loss_affinity
-
-        return all_loss
-
-
 class Criterian(nn.Module):
 
     def __init__(self):
 
+        """
+        Class which implements weighted OHNM with loss function being MSE Loss
+        """
+
         super(Criterian, self).__init__()
 
-    def forward(self, output, weight, weight_affinity):
+    def forward(self, output, character_map, affinity_map, character_weight=None, affinity_weight=None):
 
-        batchsize, channels, height, width = output.shape
+        """
 
-        output = output.permute(0, 2, 3, 1).contiguous().view([batchsize * height * width, channels])
+        :param output: prediction output of the model of shape [batch_size, 2, height, width]
+        :param character_map: target character map of shape [batch_size, height, width]
+        :param affinity_map: target affinity map of shape [batch_size, height, width]
+        :param character_weight: weight given to each pixel using weak-supervision for characters
+        :param affinity_weight: weight given to each pixel using weak-supervision for affinity
+        :return: loss containing loss of character heat map and affinity heat map reconstruction
+        """
+
+        batch_size, channels, height, width = output.shape
+
+        output = output.permute(0, 2, 3, 1).contiguous().view([batch_size * height * width, channels])
 
         character = output[:, 0]
         affinity = output[:, 1]
 
-        weight_affinity = weight_affinity.view([batchsize * height * width])
-        weight = weight.view([batchsize * height * width])
+        affinity_map = affinity_map.view([batch_size * height * width])
+        character_map = character_map.view([batch_size * height * width])
 
-        loss_character = HNM(character, weight)
-        loss_affinity = HNM(affinity, weight_affinity)
+        if character_weight is not None:
+            character_weight = character_weight.view([batch_size * height * width])
+
+        if affinity_weight is not None:
+            affinity_weight = affinity_weight.view([batch_size * height * width])
+
+        loss_character = hard_negative_mining(character, character_map, character_weight)
+        loss_affinity = hard_negative_mining(affinity, affinity_map, affinity_weight)
 
         all_loss = loss_character + loss_affinity
 
@@ -90,18 +88,18 @@ class ConvBlock(nn.Module):
     Helper module that consists of a Conv -> BN -> ReLU
     """
 
-    def __init__(self, in_channels, out_channels, padding=1, kernel_size=3, stride=1, with_nonlinearity=True):
+    def __init__(self, in_channels, out_channels, padding=1, kernel_size=3, stride=1, with_non_linearity=True):
         super().__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, padding=padding, kernel_size=kernel_size, stride=stride)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU()
-        self.with_nonlinearity = with_nonlinearity
+        self.ReLU = nn.ReLU()
+        self.with_non_linearity = with_non_linearity
 
     def forward(self, x):
         x = self.conv(x)
         x = self.bn(x)
-        if self.with_nonlinearity:
-            x = self.relu(x)
+        if self.with_non_linearity:
+            x = self.ReLU(x)
         return x
 
 
@@ -149,7 +147,7 @@ class UpBlockForUNetWithResNet50(nn.Module):
         """
         :param up_x: this is the output from the previous up block
         :param down_x: this is the output from the down block
-        :return: upsampled feature map
+        :return: up-sampled feature map
         """
         x = self.upsample(up_x)
         x = torch.cat([x, down_x], 1)
@@ -159,6 +157,10 @@ class UpBlockForUNetWithResNet50(nn.Module):
 
 
 class UNetWithResnet50Encoder(nn.Module):
+
+    """
+        U architecture model used for prediction. This is different from the model used in the original paper
+    """
 
     DEPTH = 6
 

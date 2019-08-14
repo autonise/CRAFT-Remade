@@ -9,13 +9,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 from src.utils.parallel import DataParallelModel, DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, get_word_poly
+from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch
 
 DATA_DEBUG = False
 
 if DATA_DEBUG:
 	config.num_cuda = '0'
-	config.batchsize['test'] = 1
+	config.batch_size['test'] = 1
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
@@ -74,12 +74,12 @@ def test(dataloader, lossCriterian, model):
 			all_loss.append(loss.item())
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
-			predicted_bbox = get_word_poly(
+			predicted_bbox = generate_word_bbox_batch(
 				output[:, 0, :, :].data.cpu().numpy(),
 				output[:, 1, :, :].data.cpu().numpy(),
 				character_threshold=config.threshold_character,
 				affinity_threshold=config.threshold_affinity)
-			target_bbox = get_word_poly(
+			target_bbox = generate_word_bbox_batch(
 				weight.data.cpu().numpy(),
 				weight_affinity.data.cpu().numpy(),
 				character_threshold=config.threshold_character,
@@ -134,7 +134,7 @@ def main(model_path):
 		model = model.cuda()
 
 	test_dataloader = DataLoader(
-		test_dataloader, batch_size=config.batchsize['test'],
+		test_dataloader, batch_size=config.batch_size['test'],
 		shuffle=True, num_workers=16)
 
 	saved_model = torch.load(model_path)

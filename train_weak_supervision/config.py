@@ -1,5 +1,5 @@
 use_cuda = True
-num_cuda = "1"
+num_cuda = "0"
 
 save_path = '/home/SharedData/Mayank/Models/WeakSupervision/ICDAR2013'
 
@@ -17,26 +17,18 @@ DataLoaderICDAR2013_Synthesis = '/home/SharedData/Mayank/ICDAR2013/Save/s'
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
 
 batch_size = {
-	'train': 3,
-	'test': 3,
+	'train': 2,
+	'test': 2,
 }
 
 lr = {
-	1: 5e-5,
-	10000: 2.5e-5,
-	20000: 1e-5,
-	40000: 5e-6,
-	60000: 1e-6,
+	1: 1e-5,
 }
 
-periodic_fscore = 100
-periodic_output = 1000
-periodic_save = 10000
+periodic_fscore = 10
 
 threshold_character = 0.4
 threshold_affinity = 0.4
 threshold_fscore = 0.5
-threshold_first_character = 0.5
-threshold_boundary = 0.5
 
 iterations = 1000

@@ -4,9 +4,11 @@ import numpy as np
 import cv2
 import os
 import train_synth.config as config
-import json
 
-DEBUG = False
+"""
+	globally generating gaussian heatmap which will be warped for every character bbox
+"""
+DEBUG = False  # Make this True if you want to do a run on small set of Synth-Text
 
 sigma = 10
 spread = 3
@@ -15,20 +17,22 @@ mult = 1.3
 center = spread * sigma * mult / 2
 gaussian_heatmap = np.zeros([int(extent*mult), int(extent*mult)], dtype=np.float32)
 
-for i in range(int(extent*mult)):
-	for j in range(int(extent*mult)):
-		gaussian_heatmap[i, j] = 1 / 2 / np.pi / (sigma ** 2) * np.exp(
-			-1 / 2 * ((i - center - 0.5) ** 2 + (j - center - 0.5) ** 2) / (sigma ** 2))
+for i_ in range(int(extent*mult)):
+	for j_ in range(int(extent*mult)):
+		gaussian_heatmap[i_, j_] = 1 / 2 / np.pi / (sigma ** 2) * np.exp(
+			-1 / 2 * ((i_ - center - 0.5) ** 2 + (j_ - center - 0.5) ** 2) / (sigma ** 2))
 
 gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
 
 
 def four_point_transform(image, pts):
 
-	# param pts:-The coordinates of the bounding box,
-	# param image:-gausian image
-	# function:-Using the pts and the image a perspective transform is performed 
-	# returns the transformed 2d Gausian image
+	"""
+	Using the pts and the image a perspective transform is performed which returns the transformed 2d Gaussian image
+	:param image: np.array, dtype=np.uint8, shape = [height, width]
+	:param pts: np.array, dtype=np.float32 or np.int32, shape = [4, 2]
+	:return:
+	"""
 
 	max_x, max_y = np.max(pts[:, 0]).astype(np.int32), np.max(pts[:, 1]).astype(np.int32)
 
@@ -38,29 +42,35 @@ def four_point_transform(image, pts):
 		[image.shape[1] - 1, image.shape[0] - 1],
 		[0, image.shape[0] - 1]], dtype="float32")
 
-	M = cv2.getPerspectiveTransform(dst, pts)
-	warped = cv2.warpPerspective(image, M, (max_x, max_y))
+	warped = cv2.warpPerspective(image, cv2.getPerspectiveTransform(dst, pts), (max_x, max_y))
 
 	return warped
 
 
 def resize(image, character, side=768):
 
-	# param image
-	# param character
-	# param side=length of the max_side of the image to be resize default=768
-	# return : np.array(side,side,3) containing the resize the image and the average values ,resize the character
+	"""
+		Resizing the image while maintaining the aspect ratio and padding with average of the entire image to make the
+		reshaped size = (side, side)
+		:param image: np.array, dtype=np.uint8, shape=[height, width, 3]
+		ToDo - Find the exact dimensions of the character bbox and merge resize and resize_generated functions
+		:param character: np.array, dtype=np.int32 or np.float32, shape = [2, something, something]
+		:param side: new size to be reshaped to
+		:return: resized_image, corresponding reshaped character bbox
+	"""
 
 	height, width, channel = image.shape
 	max_side = max(height, width)
-	new_reisze = (int(width/max_side*side), int(height/max_side*side))
-	image = cv2.resize(image, new_reisze)
+	new_resize = (int(width/max_side*side), int(height/max_side*side))
+	image = cv2.resize(image, new_resize)
 
-	character[0, :, :] = character[0, :, :]/width*new_reisze[0]
-	character[1, :, :] = character[1, :, :]/height*new_reisze[1]
+	character[0, :, :] = character[0, :, :]/width*new_resize[0]
+	character[1, :, :] = character[1, :, :]/height*new_resize[1]
 
 	big_image = np.ones([side, side, 3], dtype=np.float32)*np.mean(image)
-	big_image[(side-image.shape[0])//2: (side-image.shape[0])//2 + image.shape[0], (side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
+	big_image[
+		(side-image.shape[0])//2: (side-image.shape[0])//2 + image.shape[0],
+		(side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
 	big_image = big_image.astype(np.uint8)
 
 	character[0, :, :] += (side-image.shape[1])//2
@@ -70,24 +80,30 @@ def resize(image, character, side=768):
 
 
 def resize_generated(image, character, side=768):
-
-	# param image
-	# param character
-	# param side=length of the max_side of the image to be resize default=768
-	# return : np.array(side,side,3) containing the resize the image and the average values ,resize the character
+	"""
+		Resizing the image while maintaining the aspect ratio and padding with average of the entire image to make the
+		reshaped size = (side, side)
+		:param image: np.array, dtype=np.uint8, shape=[height, width, 3]
+		ToDo - Find the exact dimensions of the character bbox and merge resize and resize_generated functions
+		:param character: np.array, dtype=np.int32 or np.float32, shape = [something, something, 2]
+		:param side: new size to be reshaped to
+		:return: resized_image, corresponding reshaped character bbox
+	"""
 
 	height, width, channel = image.shape
 	max_side = max(height, width)
-	new_reisze = (int(width/max_side*side), int(height/max_side*side))
-	image = cv2.resize(image, new_reisze)
+	new_resize = (int(width/max_side*side), int(height/max_side*side))
+	image = cv2.resize(image, new_resize)
 
 	for i in range(len(character)):
 
-		character[i][:, :, 0] = character[i][:, :, 0]/width*new_reisze[0]
-		character[i][:, :, 1] = character[i][:, :, 1]/height*new_reisze[1]
+		character[i][:, :, 0] = character[i][:, :, 0]/width*new_resize[0]
+		character[i][:, :, 1] = character[i][:, :, 1]/height*new_resize[1]
 
 	big_image = np.ones([side, side, 3], dtype=np.float32)*np.mean(image)
-	big_image[(side-image.shape[0])//2: (side-image.shape[0])//2 + image.shape[0], (side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
+	big_image[
+		(side-image.shape[0])//2: (side-image.shape[0])//2 + image.shape[0],
+		(side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
 	big_image = big_image.astype(np.uint8)
 
 	for i in range(len(character)):
@@ -99,14 +115,19 @@ def resize_generated(image, character, side=768):
 
 def add_character(image, bbox):
 
-	# param image:
-	# param bbox:co-ordinates of the bounding-box
-	# function:generate the transformed 2d gausian heatmap for the region score
-	# return : the modified image
+	"""
+		Add gaussian heatmap for character bbox to the image
+		:param image: 2-d array containing character heatmap
+		:param bbox: np.array, dtype=np.int32, shape = [4, 2]
+		:return: image in which the gaussian character bbox has been added
+	"""
 
 	backup = image.copy()
 
 	try:
+
+		# ToDo - handle the case when the bbox co-ordinates are outside the image which causes the try-except block to
+		#   be triggered
 
 		top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
 		if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
@@ -131,15 +152,22 @@ def add_character(image, bbox):
 
 
 def add_character_others(image, weight_map, weight_val, bbox):
-
-	# param image:
-	# param bbox:co-ordinates of the bounding-box
-	# function:generate the transformed 2d gausian heatmap for the region score
-	# return : the modified image
+	"""
+		Add gaussian heatmap for character bbox to the image and also generate weighted map for weak-supervision
+		:param image: 2-d array containing character heatmap
+		:param weight_map: 2-d array containing weight heatmap
+		:param weight_val: weight to be given to the current bbox
+		:param bbox: np.array, dtype=np.int32, shape = [4, 2]
+		:return:    image in which the gaussian character bbox has been added,
+					weight_map in which the weight as per weak-supervision has been calculated
+	"""
 
 	backup = (image.copy(), weight_map.copy())
 
 	try:
+
+		# ToDo - handle the case when the bbox co-ordinates are outside the image which causes the try-except block to
+		#   be triggered
 
 		top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
 		if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
@@ -158,8 +186,8 @@ def add_character_others(image, weight_map, weight_val, bbox):
 
 		weight_map[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
 			np.float32(transformed[
-			start_row:end_row - top_left[1],
-			start_col:end_col - top_left[0]] != 0)*weight_val
+				start_row:end_row - top_left[1],
+				start_col:end_col - top_left[0]] != 0)*weight_val
 
 		return image, weight_map
 
@@ -170,15 +198,20 @@ def add_character_others(image, weight_map, weight_val, bbox):
 
 def add_affinity(image, bbox_1, bbox_2):
 
-	# param image 
-	# param bbox1=coordinates of the first bounding box
-	# param bbox2=coordinates of the second bounding box
-	# function:- generate an affinity box using bbox1 and bbox2 
-	# return func
+	"""
+		Add gaussian heatmap for affinity bbox to the image between bbox_1, bbox_2
+		:param image: 2-d array containing affinity heatmap
+		:param bbox_1: np.array, dtype=np.int32, shape = [4, 2]
+		:param bbox_2: np.array, dtype=np.int32, shape = [4, 2]
+		:return: image in which the gaussian affinity bbox has been added
+	"""
 
 	backup = image.copy()
 
 	try:
+
+		# ToDo - handle the case when the bbox co-ordinates are outside the image which causes the try-except block to
+		#   be triggered
 
 		center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
 		tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
@@ -197,11 +230,16 @@ def add_affinity(image, bbox_1, bbox_2):
 
 def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 
-	# param image
-	# param bbox1=coordinates of the first bounding box
-	# param bbox2=coordinates of the second bounding box
-	# function:- generate an affinity box using bbox1 and bbox2
-	# return func
+	"""
+		Add gaussian heatmap for affinity bbox to the image and also generate weighted map for weak-supervision
+		:param image: 2-d array containing affinity heatmap
+		:param weight: 2-d array containing weight heatmap
+		:param weight_val: weight to be given to the current affinity bbox
+		:param bbox_1: np.array, dtype=np.int32, shape = [4, 2]
+		:param bbox_2: np.array, dtype=np.int32, shape = [4, 2]
+		:return:    image in which the gaussian affinity bbox has been added between bbox_1 and bbox_2,
+					weight_map in which the weight as per weak-supervision has been calculated
+	"""
 
 	backup = image.copy(), weight.copy()
 
@@ -224,6 +262,18 @@ def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 
 def generate_target(image_size, character_bbox, weight=None):
 
+	"""
+
+	:param image_size: size of the image on which the target needs to be generated
+	:param character_bbox: np.array, shape = [something, something ..] ToDo - Find the shape of the character bbox
+	:param weight: this function is currently only used for synth-text in which we have 100 % confidence so weight = 1
+					where the character bbox are present
+	:return: if weight is not None then target_character_heatmap otherwise target_character_heatmap,
+																			weight for weak-supervision
+	"""
+
+	# ToDo - Merge generate_target and generate_target_others. One is for synth-text and the other is for icdar 2013
+
 	character_bbox = character_bbox.transpose(2, 1, 0)
 
 	channel, height, width = image_size
@@ -241,6 +291,17 @@ def generate_target(image_size, character_bbox, weight=None):
 
 
 def generate_target_others(image_size, character_bbox, weight):
+	"""
+
+		:param image_size: size of the image on which the target needs to be generated
+		:param character_bbox: np.array, shape = [something, something ..] ToDo - Find the shape of the character bbox
+		:param weight: this function is currently only used for icdar2013, so weight is the value of weight
+																							for each character bbox
+		:return: if weight is not None then target_character_heatmap otherwise target_character_heatmap,
+																				weight for weak-supervision
+		"""
+
+	# ToDo - Merge generate_target and generate_target_others. One is for synth-text and the other is for icdar 2013
 
 	channel, height, width = image_size
 
@@ -263,8 +324,14 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 	:param image_size: shape = [3, image_height, image_width]
 	:param character_bbox: [2, 4, num_characters]
 	:param text: [num_words]
-	:return:
+	:param weight: This is currently used only for synth-text so specifying weight as not None will generate a heatmap
+					having value one where there is affinity
+	:return: if weight is not None then target_affinity_heatmap otherwise target_affinity_heatmap,
+																				weight for weak-supervision
+
 	"""
+
+	# ToDo - merge the generate_affinity function with generate_affinity_others function
 
 	character_bbox = character_bbox.transpose(2, 1, 0)
 
@@ -289,15 +356,18 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 		return target / 255
 
 
-def generate_affinity_others(image_size, character_bbox, text, weight):
+def generate_affinity_others(image_size, character_bbox, weight):
 
 	"""
 
 	:param image_size: shape = [3, image_height, image_width]
 	:param character_bbox: [2, 4, num_characters]
-	:param text: [num_words]
-	:return:
+	:param weight: This is currently used only for icdar 2013. it is a list containing weight for each bbox
+	:return: target_affinity_heatmap, weight for weak-supervision
+
 	"""
+
+	# ToDo - merge the generate_affinity function with generate_affinity_others function
 
 	channel, height, width = image_size
 
@@ -307,17 +377,29 @@ def generate_affinity_others(image_size, character_bbox, text, weight):
 	for i, word in enumerate(character_bbox):
 
 		for char_num in range(len(word)-1):
-			target, weight_map = add_affinity_others(target, weight_map, weight[i], word[char_num].copy(), word[char_num+1].copy())
+			target, weight_map = add_affinity_others(
+				target,
+				weight_map,
+				weight[i],
+				word[char_num].copy(),
+				word[char_num+1].copy())
 
 	return target/255, weight_map
 
 
 class DataLoaderSYNTH(data.Dataset):
 
+	"""
+		DataLoader for strong supervised training on Synth-Text
+	"""
+
 	def __init__(self, type_):
+
+		# ToDo - Comment the exact implementation of dataloader of SYNTH
 
 		self.type_ = type_
 		self.base_path = config.DataLoaderSYNTH_base_path
+
 		if DEBUG:
 			import os
 			if not os.path.exists('cache.pkl'):
@@ -357,7 +439,7 @@ class DataLoaderSYNTH(data.Dataset):
 		for no, i in enumerate(self.txt):
 			all_words = []
 			for j in i:
-				all_words += [k for k in ' '.join(j.split('\n')).split() if k!='']
+				all_words += [k for k in ' '.join(j.split('\n')).split() if k != '']
 			self.txt[no] = all_words
 
 	def __getitem__(self, item):
@@ -379,6 +461,10 @@ class DataLoaderSYNTH(data.Dataset):
 
 class DataLoaderEval(data.Dataset):
 
+	"""
+		DataLoader for evaluation on any custom folder given the path
+	"""
+
 	def __init__(self, path):
 
 		self.base_path = path
@@ -386,12 +472,14 @@ class DataLoaderEval(data.Dataset):
 
 	def __getitem__(self, item):
 
+		# ToDo - Specify all the operations happening inside the __getitem__ function
+
 		image = plt.imread(self.base_path+'/'+self.imnames[item])
 
 		height, width, channel = image.shape
 		max_side = max(height, width)
-		new_reisze = (int(width / max_side * 768), int(height / max_side * 768))
-		image = cv2.resize(image, new_reisze)
+		new_resize = (int(width / max_side * 768), int(height / max_side * 768))
+		image = cv2.resize(image, new_resize)
 
 		big_image = np.ones([768, 768, 3], dtype=np.float32) * np.mean(image)
 		big_image[
@@ -400,39 +488,6 @@ class DataLoaderEval(data.Dataset):
 		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
 
 		return big_image.astype(np.float32), self.imnames[item], np.array([height, width])
-
-	def __len__(self):
-
-		return len(self.imnames)
-	
-	
-class DataLoaderEvalICDAR2013(data.Dataset):
-
-	def __init__(self, path):
-
-		self.base_path = config.ICDAR2013_path
-		with open(self.base_path+'/gt.json', 'r') as f:
-			self.gt = json.load(f)
-
-		self.imnames = sorted(self.gt['annots'].keys())
-		self.unknown = self.gt['unknown']
-
-	def __getitem__(self, item):
-
-		image = plt.imread(self.base_path+'/Images/'+self.imnames[item])
-
-		height, width, channel = image.shape
-		max_side = max(height, width)
-		new_reisze = (int(width / max_side * 768), int(height / max_side * 768))
-		image = cv2.resize(image, new_reisze)
-
-		big_image = np.ones([768, 768, 3], dtype=np.float32) * np.mean(image)
-		big_image[
-			(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
-			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
-		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
-
-		return big_image.astype(np.float32), self.imnames[item], np.array([height, width]), item
 
 	def __len__(self):
 

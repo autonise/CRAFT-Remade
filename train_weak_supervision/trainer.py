@@ -1,8 +1,8 @@
 from train_weak_supervision.dataloader import DataLoaderMIX
 import train_weak_supervision.config as config
-from src.model import WeightedCriterian
+from src.model import Criterian
 from src.utils.parallel import DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, get_word_poly
+from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -47,12 +47,13 @@ def save(data, output, target, target_affinity, epoch, no):
 def train(model, optimizer, iteration):
 
 	dataloader = DataLoader(DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=8)
-	lossCriterian = DataParallelCriterion(WeightedCriterian())
+	lossCriterian = DataParallelCriterion(Criterian())
 
 	model.train()
 	optimizer.zero_grad()
 	iterator = tqdm(dataloader)
 
+	"""
 	def change_lr(no):
 
 		# Change learning rate while training
@@ -63,12 +64,13 @@ def train(model, optimizer, iteration):
 				for param_group in optimizer.param_groups:
 					param_group['lr'] = config.lr[i]
 
+	change_lr(1)
+	"""
+
 	all_loss = []
 	all_accuracy = []
 
 	for no, (image, character_map, affinity_map, character_weight, affinity_weight) in enumerate(iterator):
-
-		change_lr(no)
 
 		if DATA_DEBUG:
 			continue
@@ -104,38 +106,20 @@ def train(model, optimizer, iteration):
 					int(np.array(all_accuracy)[-min(1000, len(all_accuracy)):].mean() * 100000000) / 100000000)
 			)
 
-		if no >= 1000:
-			if no % config.periodic_fscore == 0 and no != 0:
-				if type(output) == list:
-					output = torch.cat(output, dim=0)
-				predicted_bbox = get_word_poly(
-					output[:, 0, :, :].data.cpu().numpy(),
-					output[:, 1, :, :].data.cpu().numpy(),
-					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity)
-				target_bbox = get_word_poly(
-					character_map.data.cpu().numpy(),
-					affinity_map.data.cpu().numpy(),
-					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity)
-				all_accuracy.append(
-					calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore))
-
-		if no % config.periodic_output == 0 and no != 0:
-			if type(output) == list:
-				output = torch.cat(output, dim=0)
-			save(image, output, character_map, affinity_map, iteration, no)
-
-		if no % config.periodic_save == 0 and no != 0:
-			torch.save(
-				{
-					'state_dict': model.state_dict(),
-					'optimizer': optimizer.state_dict()
-				}, config.save_path + '/' + str(no) + '_model.pkl')
-			np.save(config.save_path + '/loss_plot_training.npy', all_loss)
-			plt.plot(all_loss)
-			plt.savefig(config.save_path + '/loss_plot_training.png')
-			plt.clf()
+		if type(output) == list:
+			output = torch.cat(output, dim=0)
+		predicted_bbox = generate_word_bbox_batch(
+			output[:, 0, :, :].data.cpu().numpy(),
+			output[:, 1, :, :].data.cpu().numpy(),
+			character_threshold=config.threshold_character,
+			affinity_threshold=config.threshold_affinity)
+		target_bbox = generate_word_bbox_batch(
+			character_map.data.cpu().numpy(),
+			affinity_map.data.cpu().numpy(),
+			character_threshold=config.threshold_character,
+			affinity_threshold=config.threshold_affinity)
+		all_accuracy.append(
+			calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore))
 
 	torch.cuda.empty_cache()
 
