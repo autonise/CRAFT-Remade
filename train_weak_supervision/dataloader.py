@@ -8,7 +8,7 @@ import json
 from train_synth.dataloader import resize, resize_generated, generate_affinity, generate_target, generate_target_others, generate_affinity_others
 
 
-DEBUG = True
+DEBUG = False
 
 
 class DataLoaderMIX(data.Dataset):
