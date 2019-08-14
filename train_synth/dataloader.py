@@ -8,7 +8,6 @@ import train_synth.config as config
 """
 	globally generating gaussian heatmap which will be warped for every character bbox
 """
-DEBUG = False  # Make this True if you want to do a run on small set of Synth-Text
 
 sigma = 10
 spread = 3
@@ -393,16 +392,21 @@ class DataLoaderSYNTH(data.Dataset):
 		DataLoader for strong supervised training on Synth-Text
 	"""
 
-	def __init__(self, type_):
+	DEBUG = False  # Make this True if you want to do a run on small set of Synth-Text
 
-		# ToDo - Comment the exact implementation of dataloader of SYNTH
+	def __init__(self, type_):
 
 		self.type_ = type_
 		self.base_path = config.DataLoaderSYNTH_base_path
 
-		if DEBUG:
-			import os
+		if DataLoaderSYNTH.DEBUG:
+
+			# To check for small data sample of Synth
+
 			if not os.path.exists('cache.pkl'):
+
+				# Create cache of 1000 samples if it does not exist
+
 				with open('cache.pkl', 'wb') as f:
 					import pickle
 					from scipy.io import loadmat
@@ -411,6 +415,9 @@ class DataLoaderSYNTH(data.Dataset):
 					print('Created the pickle file, rerun the program')
 					exit(0)
 			else:
+
+				# Read the Cache
+
 				with open('cache.pkl', 'rb') as f:
 					import pickle
 					self.imnames, self.charBB, self.txt = pickle.load(f)
@@ -419,7 +426,10 @@ class DataLoaderSYNTH(data.Dataset):
 		else:
 
 			from scipy.io import loadmat
-			mat = loadmat(config.DataLoaderSYNTH_mat)
+			mat = loadmat(config.DataLoaderSYNTH_mat)  # Loads MATLAB .mat extension as a dictionary of numpy arrays
+
+			# Read documentation of how synth-text dataset is stored to understand the processing at
+			# http://www.robots.ox.ac.uk/~vgg/data/scenetext/readme.txt
 
 			total_number = mat['imnames'][0].shape[0]
 			train_images = int(total_number * 0.9)
@@ -440,17 +450,17 @@ class DataLoaderSYNTH(data.Dataset):
 			all_words = []
 			for j in i:
 				all_words += [k for k in ' '.join(j.split('\n')).split() if k != '']
+				# Getting all words given paragraph like text in SynthText
+
 			self.txt[no] = all_words
 
 	def __getitem__(self, item):
 
-		image = plt.imread(self.base_path+'/'+self.imnames[item][0])
-		print(self.charBB[item].copy())
-		exit(0)
-		image, character = resize(image, self.charBB[item].copy())
+		image = plt.imread(self.base_path+'/'+self.imnames[item][0])  # Read the image
+		image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
 		image = image.transpose(2, 0, 1)/255
-		weight = generate_target(image.shape, character.copy())
-		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())
+		weight = generate_target(image.shape, character.copy())  # Generate character heatmap
+		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())  # Generate affinity heatmap
 
 		return image.astype(np.float32), weight.astype(np.float32), weight_affinity.astype(np.float32)
 
@@ -472,9 +482,9 @@ class DataLoaderEval(data.Dataset):
 
 	def __getitem__(self, item):
 
-		# ToDo - Specify all the operations happening inside the __getitem__ function
+		image = plt.imread(self.base_path+'/'+self.imnames[item])  # Read the image
 
-		image = plt.imread(self.base_path+'/'+self.imnames[item])
+		# ------ Resize the image to (768, 768) ---------- #
 
 		height, width, channel = image.shape
 		max_side = max(height, width)

@@ -8,6 +8,12 @@ import torch
 
 def get_initial_model_optimizer(path):
 
+	"""
+	Function to load pre-trained optimizer and model
+	:param path: path to the model
+	:return: model, optimizer
+	"""
+
 	model = UNetWithResnet50Encoder()
 
 	if config.use_cuda:
@@ -24,11 +30,28 @@ def get_initial_model_optimizer(path):
 
 def generate_target(model, iteration):
 
-	generator(config.images_path, base_target_path=config.target_path+'/'+str(iteration), model=model)
+	"""
+	Generate the target after every iteration
+
+	:param model: Pytorch model UNet-ResNet
+	:param iteration: weak-supervision current iteration
+	:return: None
+	"""
+
+	generator(base_target_path=config.target_path+'/'+str(iteration), model=model)
 	torch.cuda.empty_cache()
 
 
 def save_model(model, optimizer, state, iteration=None):
+
+	"""
+	Function to save the model and optimizer state dict
+	:param model: Pytorch model
+	:param optimizer: Adam Optimizer
+	:param state: 'intermediate' or 'final'
+	:param iteration: weak-supervision current iteration
+	:return: None
+	"""
 
 	if state == 'intermediate':
 		torch.save(

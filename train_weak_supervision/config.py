@@ -1,3 +1,7 @@
+"""
+Config containing all hardcoded parameters for training weak supervised model on datasets like icdar 2013
+"""
+
 use_cuda = True
 num_cuda = "0"
 

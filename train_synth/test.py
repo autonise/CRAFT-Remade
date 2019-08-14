@@ -11,29 +11,34 @@ import random
 from src.utils.parallel import DataParallelModel, DataParallelCriterion
 from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch
 
-DATA_DEBUG = False
-
-if DATA_DEBUG:
-	config.num_cuda = '0'
-	config.batch_size['test'] = 1
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
 
-def save(data, output, target, target_affinity, epoch, no):
+def save(data, output, target, target_affinity, no):
+
+	"""
+	Saving the synthesised outputs in between the training
+	:param data: image as tensor
+	:param output: predicted output from the model as tensor
+	:param target: character heatmap target as tensor
+	:param target_affinity: affinity heatmap target as tensor
+	:param no: current iteration number
+	:return: None
+	"""
 
 	output = output.data.cpu().numpy()
 	data = data.data.cpu().numpy()
 	target = target.data.cpu().numpy()
 	target_affinity = target_affinity.data.cpu().numpy()
 
-	batchsize = output.shape[0]
+	batch_size = output.shape[0]
 
-	base = 'test_synthesis/'+str(epoch)+'_'+str(no)+'/'
+	base = 'test_synthesis/'+str(no)+'/'
 
 	os.makedirs(base, exist_ok=True)
 
-	for i in range(batchsize):
+	for i in range(batch_size):
 		
 		os.makedirs(base+str(i), exist_ok=True)
 		character_bbox = output[i, 0, :, :]
@@ -47,13 +52,27 @@ def save(data, output, target, target_affinity, epoch, no):
 		plt.imsave(base + str(i) + '/pred_characters.png', character_bbox, cmap='gray')
 		plt.imsave(base + str(i) + '/pred_affinity.png', affinity_bbox, cmap='gray')
 
-		plt.imsave(base + str(i) + '/pred_characters_thresh.png', np.float32(character_bbox>config.threshold_character), cmap='gray')
-		plt.imsave(base + str(i) + '/pred_affinity_thresh.png', np.float32(affinity_bbox>config.threshold_affinity), cmap='gray')
+		# Thresholding the character and affinity heatmap
+
+		plt.imsave(
+			base + str(i) + '/pred_characters_thresh.png',
+			np.float32(character_bbox > config.threshold_character), cmap='gray')
+		plt.imsave(
+			base + str(i) + '/pred_affinity_thresh.png',
+			np.float32(affinity_bbox > config.threshold_affinity), cmap='gray')
 
 
-def test(dataloader, lossCriterian, model):
+def test(dataloader, loss_criterian, model):
 
-	with torch.no_grad():
+	"""
+	Function to test
+	:param dataloader: Pytorch dataloader
+	:param loss_criterian: Loss function with OHNM using MSE Loss
+	:param model: Pytorch model of UNet-ResNet
+	:return: all iteration loss values
+	"""
+
+	with torch.no_grad():  # For no gradient calculation
 
 		model.eval()
 		iterator = tqdm(dataloader)
@@ -62,28 +81,29 @@ def test(dataloader, lossCriterian, model):
 
 		for no, (image, weight, weight_affinity) in enumerate(iterator):
 
-			if DATA_DEBUG:
-				continue
-
 			if config.use_cuda:
 				image, weight, weight_affinity = image.cuda(), weight.cuda(), weight_affinity.cuda()
 
 			output = model(image)
-			loss = lossCriterian(output, weight, weight_affinity).mean()
+			loss = loss_criterian(output, weight, weight_affinity).mean()
 
 			all_loss.append(loss.item())
+
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
+
 			predicted_bbox = generate_word_bbox_batch(
 				output[:, 0, :, :].data.cpu().numpy(),
 				output[:, 1, :, :].data.cpu().numpy(),
 				character_threshold=config.threshold_character,
 				affinity_threshold=config.threshold_affinity)
+
 			target_bbox = generate_word_bbox_batch(
 				weight.data.cpu().numpy(),
 				weight_affinity.data.cpu().numpy(),
 				character_threshold=config.threshold_character,
 				affinity_threshold=config.threshold_affinity)
+
 			all_accuracy.append(calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore))
 
 			iterator.set_description(
@@ -96,7 +116,7 @@ def test(dataloader, lossCriterian, model):
 			if no % config.periodic_output == 0 and no != 0:
 				if type(output) == list:
 					output = torch.cat(output, dim=0)
-				save(image, output, weight, weight_affinity, 0, no)
+				save(image, output, weight, weight_affinity, no)
 
 		return all_loss
 
@@ -116,8 +136,6 @@ def main(model_path):
 
 	seed()
 
-	epoch = 0
-
 	model = UNetWithResnet50Encoder()
 
 	model_parameters = filter(lambda p: p.requires_grad, model.parameters())
@@ -126,7 +144,7 @@ def main(model_path):
 	print('Total number of trainable parameters: ', params)
 
 	model = DataParallelModel(model)
-	lossCriterian = DataParallelCriterion(Criterian())
+	loss_criterian = DataParallelCriterion(Criterian())
 
 	test_dataloader = DataLoaderSYNTH('test')
 
@@ -140,9 +158,6 @@ def main(model_path):
 	saved_model = torch.load(model_path)
 	model.load_state_dict(saved_model['state_dict'])
 
-	all_loss = test(test_dataloader, lossCriterian, model)
+	all_loss = test(test_dataloader, loss_criterian, model)
+
 	print('Average Loss on the testing set is:', all_loss)
-
-
-if __name__ == "__main__":
-	main('/home/Krishna.Wadhwani/Dataset/Programs/CRAFT-Remade/Stage-1/model/final_model.pkl')

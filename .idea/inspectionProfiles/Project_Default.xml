@@ -22,6 +22,7 @@
       <option name="ignoredIdentifiers">
         <list>
           <option value="torch.cat" />
+          <option value="torch.backends.cudnn" />
         </list>
       </option>
     </inspection_tool>
