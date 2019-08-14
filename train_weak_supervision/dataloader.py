@@ -80,7 +80,7 @@ class DataLoaderMIX(data.Dataset):
 		else:
 
 			image = plt.imread(self.base_path_other_images+'/'+self.gt[item % len(self.gt)][0])
-			character = self.gt[item % len(self.gt)][1]['characters']
+			character = [np.array(char_i) for char_i in self.gt[item % len(self.gt)][1]['characters']]
 			image, character = resize_generated(image, character.copy())
 			image = image.transpose(2, 0, 1) / 255
 			weights = [i for i in self.gt[item % len(self.gt)][1]['weights']]

@@ -74,8 +74,16 @@ def test(dataloader, lossCriterian, model):
 			all_loss.append(loss.item())
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
-			predicted_bbox = get_word_poly(output[:, 0, :, :].data.cpu().numpy(), output[:, 1, :, :].data.cpu().numpy())
-			target_bbox = get_word_poly(weight.data.cpu().numpy(), weight_affinity.data.cpu().numpy())
+			predicted_bbox = get_word_poly(
+				output[:, 0, :, :].data.cpu().numpy(),
+				output[:, 1, :, :].data.cpu().numpy(),
+				character_threshold=config.threshold_character,
+				affinity_threshold=config.threshold_affinity)
+			target_bbox = get_word_poly(
+				weight.data.cpu().numpy(),
+				weight_affinity.data.cpu().numpy(),
+				character_threshold=config.threshold_character,
+				affinity_threshold=config.threshold_affinity)
 			all_accuracy.append(calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore))
 
 			iterator.set_description(

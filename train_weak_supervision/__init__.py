@@ -25,6 +25,7 @@ def get_initial_model_optimizer(path):
 def generate_target(model, iteration):
 
 	generator(config.images_path, base_target_path=config.target_path+'/'+str(iteration), model=model)
+	torch.cuda.empty_cache()
 
 
 def save_model(model, optimizer, state, iteration=None):

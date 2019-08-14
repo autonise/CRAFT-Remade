@@ -78,7 +78,7 @@ def train(model, optimizer, iteration):
 			character_weight, affinity_weight = character_weight.cuda(), affinity_weight.cuda()
 
 		output = model(image)
-		loss = lossCriterian(output, character_map, affinity_map).mean()
+		loss = lossCriterian(output, character_map, affinity_map, character_weight, affinity_weight).mean()
 
 		all_loss.append(loss.item())
 
@@ -108,8 +108,16 @@ def train(model, optimizer, iteration):
 			if no % config.periodic_fscore == 0 and no != 0:
 				if type(output) == list:
 					output = torch.cat(output, dim=0)
-				predicted_bbox = get_word_poly(output[:, 0, :, :].data.cpu().numpy(), output[:, 1, :, :].data.cpu().numpy())
-				target_bbox = get_word_poly(character_map.data.cpu().numpy(), affinity_map.data.cpu().numpy())
+				predicted_bbox = get_word_poly(
+					output[:, 0, :, :].data.cpu().numpy(),
+					output[:, 1, :, :].data.cpu().numpy(),
+					character_threshold=config.threshold_character,
+					affinity_threshold=config.threshold_affinity)
+				target_bbox = get_word_poly(
+					character_map.data.cpu().numpy(),
+					affinity_map.data.cpu().numpy(),
+					character_threshold=config.threshold_character,
+					affinity_threshold=config.threshold_affinity)
 				all_accuracy.append(
 					calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore))
 
@@ -128,5 +136,7 @@ def train(model, optimizer, iteration):
 			plt.plot(all_loss)
 			plt.savefig(config.save_path + '/loss_plot_training.png')
 			plt.clf()
+
+	torch.cuda.empty_cache()
 
 	return model, optimizer

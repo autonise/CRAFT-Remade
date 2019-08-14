@@ -1,7 +1,5 @@
 from shapely.geometry import Polygon
 import numpy as np
-import train_synth.config as config
-# ToDO pass the config everytime when it is required. Don't make the utils folder specific to some config
 import cv2
 import networkx as nx
 
@@ -16,6 +14,39 @@ def weighing_function(orig_length, cur_length):
 	"""
 
 	return (orig_length - min(orig_length, abs(orig_length - cur_length)))/orig_length
+
+
+def cutter(word_bbox, num_characters):
+
+	if type(word_bbox) == list:
+		word_bbox = np.array(word_bbox.copy())
+
+	x = [np.sqrt(np.sum(np.square(word_bbox[i, :] - word_bbox[(i+1)%4, :]))) for i in range(4)]
+
+	width1_0 = np.argmax(x)
+	width1_1 = (width1_0 + 1)%4
+	width2_0 = (width1_0 + 3)%4
+
+	width = x[width1_0]
+
+	direction = (word_bbox[width1_1] - word_bbox[width1_0])/width
+	character_width = width/num_characters
+
+	char_bbox = np.zeros([num_characters, 4, 2])
+	co_ordinates = np.zeros([num_characters + 1, 2, 2])
+
+	co_ordinates[0, 0] = word_bbox[width1_0]
+	co_ordinates[0, 1] = word_bbox[width2_0]
+
+	for i in range(1, num_characters + 1):
+		co_ordinates[i, 0] = co_ordinates[i - 1, 0] + direction*character_width
+		co_ordinates[i, 1] = co_ordinates[i - 1, 1] + direction*character_width
+		char_bbox[i-1, 0] = co_ordinates[i - 1, 0]
+		char_bbox[i-1, 1] = co_ordinates[i, 0]
+		char_bbox[i-1, 2] = co_ordinates[i, 1]
+		char_bbox[i-1, 3] = co_ordinates[i - 1, 1]
+
+	return char_bbox
 
 
 def get_weighted_character_target(generated_targets, original_annotation, unkown_symbol):
@@ -49,19 +80,27 @@ def get_weighted_character_target(generated_targets, original_annotation, unkown
 				break
 
 		if found_no == -1:
-			# ToDo - Write the code for breaking the word_bbox in equal parts and
-			#  appending to the aligned_generated_targets['characters']
+
+			# If not found and unknown_symbol is there this will create problems
+
+			characters = cutter(orig_annot, len(original_annotation['text'][orig_no]))
+			aligned_generated_targets['characters'][orig_no] = characters.astype(np.int32).tolist()
+			aligned_generated_targets['weights'][orig_no] = 0.5
+
+		elif original_annotation['text'][orig_no] == unkown_symbol:
 
 			aligned_generated_targets['weights'][orig_no] = 0.5
-		elif original_annotation['text'][found_no] == unkown_symbol:
-
-			aligned_generated_targets['weights'][orig_no] = 0.5
-			for i in generated_targets['characters'][found_no]:
-				aligned_generated_targets['characters'][orig_no].append(i)
+			aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
 		else:
-			aligned_generated_targets['weights'][orig_no] = weighing_function(len(original_annotation['text'][found_no]), len(generated_targets['characters'][no]))
-			for i in generated_targets['characters'][found_no]:
-				aligned_generated_targets['characters'][orig_no].append(i)
+			weight = weighing_function(len(original_annotation['text'][orig_no]), len(generated_targets['characters'][found_no]))
+
+			if weight < 0.5:
+				characters = cutter(orig_annot, len(original_annotation['text'][orig_no]))
+				aligned_generated_targets['characters'][orig_no] = characters.astype(np.int32).tolist()
+				aligned_generated_targets['weights'][orig_no] = 0.5
+			else:
+				aligned_generated_targets['weights'][orig_no] = weight
+				aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
 
 	return aligned_generated_targets
 
@@ -81,7 +120,7 @@ def remove_small_predictions(image):
 	return image
 
 
-def generate_bbox(weight, weight_affinity, character_threshold=config.threshold_character, affinity_threshold=config.threshold_affinity):
+def generate_bbox(weight, weight_affinity, character_threshold, affinity_threshold):
 
 	"""
 
@@ -345,7 +384,7 @@ def join_with_characters(characters, joints):
 	return all_word_contours, all_character_contours
 
 
-def get_word_poly(weight, weight_affinity, character_threshold=config.threshold_character, affinity_threshold=config.threshold_affinity):
+def get_word_poly(weight, weight_affinity, character_threshold, affinity_threshold):
 
 	"""
 
@@ -396,3 +435,9 @@ def get_word_poly(weight, weight_affinity, character_threshold=config.threshold_
 		word_bbox.append(np.array(join(all_characters, all_joins)))
 
 	return word_bbox
+
+
+if __name__ == "__main__":
+
+	word_bbox = [[10, 100], [20, 100], [20, 10], [10, 10]]
+	print(cutter(word_bbox, 5))

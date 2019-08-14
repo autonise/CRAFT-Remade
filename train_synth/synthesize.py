@@ -118,14 +118,15 @@ def synthesize_with_score(dataloader, model, base_target_path):
 				character_bbox = cv2.resize(output[i, 0, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
 				affinity_bbox = cv2.resize(output[i, 1, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
 
-				generated_targets = generate_bbox(character_bbox, affinity_bbox)
+				generated_targets = generate_bbox(
+					character_bbox, affinity_bbox,
+					character_threshold=config.threshold_character,
+					affinity_threshold=config.threshold_affinity)
 
 				if 'error_message' in generated_targets.keys():
 					print('There was an error while generating the target of ', image_name[i])
 					print('Error:', generated_targets['error_message'])
 					continue
-
-				# ToDo - Incorporate that if weight < 0.5  or if word not detected then cut the bbox in equal parts
 
 				generated_targets = get_weighted_character_target(generated_targets, {'bbox': annots[i]['bbox'], 'text': annots[i]['text']}, dataloader.dataset.unknown)
 
@@ -163,8 +164,6 @@ def main(folder_path, base_path_character=None, base_path_affinity=None, model_p
 
 
 def generator(folder_path, base_target_path, model_path=None, model=None):
-
-	# ToDo - Check if everything works in a iterative fashion
 
 	os.makedirs(base_target_path, exist_ok=True)
 

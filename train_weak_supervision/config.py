@@ -1,9 +1,9 @@
 use_cuda = True
-num_cuda = "0,3"
+num_cuda = "1"
 
 save_path = '/home/SharedData/Mayank/Models/WeakSupervision/ICDAR2013'
 
-images_path = '/home/SharedData/Mayank/ICDAR2013/ch2_training_images'
+images_path = '/home/SharedData/Mayank/ICDAR2013/Images'
 target_path = '/home/SharedData/Mayank/ICDAR2013/Generated'
 
 prob_synth = 0.2
@@ -17,7 +17,7 @@ DataLoaderICDAR2013_Synthesis = '/home/SharedData/Mayank/ICDAR2013/Save/s'
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
 
 batch_size = {
-	'train': 6,
+	'train': 3,
 	'test': 3,
 }
 

@@ -30,7 +30,6 @@ def four_point_transform(image, pts):
 	# function:-Using the pts and the image a perspective transform is performed 
 	# returns the transformed 2d Gausian image
 
-
 	max_x, max_y = np.max(pts[:, 0]).astype(np.int32), np.max(pts[:, 1]).astype(np.int32)
 
 	dst = np.array([
@@ -83,16 +82,17 @@ def resize_generated(image, character, side=768):
 	image = cv2.resize(image, new_reisze)
 
 	for i in range(len(character)):
-		character[i][0, :, :] = character[i][0, :, :]/width*new_reisze[0]
-		character[i][1, :, :] = character[i][1, :, :]/height*new_reisze[1]
+
+		character[i][:, :, 0] = character[i][:, :, 0]/width*new_reisze[0]
+		character[i][:, :, 1] = character[i][:, :, 1]/height*new_reisze[1]
 
 	big_image = np.ones([side, side, 3], dtype=np.float32)*np.mean(image)
 	big_image[(side-image.shape[0])//2: (side-image.shape[0])//2 + image.shape[0], (side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
 	big_image = big_image.astype(np.uint8)
 
 	for i in range(len(character)):
-		character[i][0, :, :] += (side-image.shape[1])//2
-		character[i][1, :, :] += (side-image.shape[0])//2
+		character[i][:, :, 0] += (side-image.shape[1])//2
+		character[i][:, :, 1] += (side-image.shape[0])//2
 
 	return big_image, character
 
@@ -304,14 +304,9 @@ def generate_affinity_others(image_size, character_bbox, text, weight):
 	target = np.zeros([height, width], dtype=np.uint8)
 	weight_map = np.zeros([height, width], dtype=np.float32)
 
-	print(len(weight), character_bbox.shape, text)
-
 	for i, word in enumerate(character_bbox):
 
 		for char_num in range(len(word)-1):
-			weight[i]
-			word[char_num]
-			word[char_num+1]
 			target, weight_map = add_affinity_others(target, weight_map, weight[i], word[char_num].copy(), word[char_num+1].copy())
 
 	return target/255, weight_map
@@ -368,6 +363,8 @@ class DataLoaderSYNTH(data.Dataset):
 	def __getitem__(self, item):
 
 		image = plt.imread(self.base_path+'/'+self.imnames[item][0])
+		print(self.charBB[item].copy())
+		exit(0)
 		image, character = resize(image, self.charBB[item].copy())
 		image = image.transpose(2, 0, 1)/255
 		weight = generate_target(image.shape, character.copy())
