@@ -1,8 +1,46 @@
-# Implementing CRAFT https://arxiv.org/pdf/1904.01941.pdf
+# Re-Implementing CRAFT-Character Region Awareness for Text Detection
 
 
-## Stage 1 (PreTrained Model)
+## Objective
 
-    This is for training the character prediction model on SynthText.
-    Using this pre-trained model we can start training the weak-supervision part on ICDAR 2013/15/17
+- [ ] Reproduce weak-supervision training as mentioned in the paper https://arxiv.org/pdf/1904.01941.pdf
+- [ ] Generate character bbox on all the popular data sets.
+- [ ] Expose pre-trained models with command line interface to synthesize results on custom images
+
+## Running on custom images
+
+Put the images inside a folder.
+<br>Get a pre-trained model from the pre-trained model list (Currently only strong supervision using SYNTH-Text available)
+<br>Run the command - 
+
+    python main.py train_synth --mode=synthesize --model=/path/to/model --folder=/path/to/images/
     
+## Pre-trained models
+
+### Strong Supervision
+
+    SYNTHTEXT - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T
+    
+### Weak Supervision
+
+    - [ ] ICDAR 2013 - yet_to_be_completed
+    - [ ] ICDAR 2015 - yet_to_be_completed
+    - [ ] ICDAR 2017 - yet_to_be_completed
+    - [ ] Total Text - yet_to_be_completed
+    - [ ] MS-COCO - yet_to_be_completed
+    
+## Pre-generated on popular data sets
+
+    - [ ] ICDAR 2013 - yet_to_be_completed
+    - [ ] ICDAR 2015 - yet_to_be_completed
+    - [ ] ICDAR 2017 - yet_to_be_completed
+    - [ ] Total Text - yet_to_be_completed
+    - [ ] MS-COCO - yet_to_be_completed
+    
+## How to train on your own dataset
+
+Download the pre-trained model on Synthetic dataset at https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T
+<br> Make your own custom dataloader as in train_weak_supervision/dataloader.DataLoaderMIX
+<br> Run the command - 
+    
+    python main.py weak_supervision --model=/path/to/pre-trained/Synth-Text-Model --iterations=epochs-of-weak-supervision
