@@ -5,17 +5,12 @@ Config containing all hardcoded parameters for training strong supervised model 
 num_cuda = "0"
 seed = 0
 save_path = '/home/SharedData/Mayank/Models/SYNTH'
-use_cuda = True
+use_cuda = False
 
 batch_size = {
 	'train': 3,
-	'test': 3,
+	'test': 1,
 }
-
-DEBUG = False
-if DEBUG:
-	batch_size['train'] = 1
-	num_cuda = '0'
 
 pretrained = False
 pretrained_path = ''
