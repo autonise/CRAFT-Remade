@@ -16,16 +16,20 @@
       <w>icdar</w>
       <w>imnames</w>
       <w>matlab</w>
+      <w>matplotlib</w>
       <w>mayank</w>
       <w>mult</w>
       <w>ohnm</w>
+      <w>opencv</w>
       <w>pred</w>
       <w>pretrained</w>
       <w>pytorch</w>
       <w>resnet</w>
+      <w>scipy</w>
       <w>synth</w>
       <w>thresholded</w>
       <w>thresholding</w>
+      <w>tqdm</w>
       <w>uint</w>
       <w>upsample</w>
       <w>upsampling</w>
