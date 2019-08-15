@@ -47,15 +47,18 @@ def train_synth(mode, model=None, folder=None):
 		else:
 			print('Will generate the predictions at: ', '/'.join(folder.split('/')[:-1])+'/target_affinity')
 			print('Will generate the predictions at: ', '/'.join(folder.split('/')[:-1])+'/target_character')
+			print('Will generate the predictions at: ', '/'.join(folder.split('/')[:-1]) + '/word_bbox')
 
 			os.makedirs('/'.join(folder.split('/')[:-1])+'/target_affinity', exist_ok=True)
 			os.makedirs('/'.join(folder.split('/')[:-1])+'/target_character', exist_ok=True)
+			os.makedirs('/'.join(folder.split('/')[:-1])+'/word_bbox', exist_ok=True)
 
 			synthesize.main(
 				folder,
 				model_path=model,
 				base_path_character='/'.join(folder.split('/')[:-1])+'/target_character',
-				base_path_affinity='/'.join(folder.split('/')[:-1])+'/target_affinity')
+				base_path_affinity='/'.join(folder.split('/')[:-1])+'/target_affinity',
+				base_path_bbox='/'.join(folder.split('/')[:-1])+'/word_bbox',)
 
 	else:
 		print('Invalid Mode')

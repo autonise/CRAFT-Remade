@@ -1,7 +1,6 @@
 import train_synth.config as config
 from src.model import UNetWithResnet50Encoder
 from train_synth.dataloader import DataLoaderEval
-from train_weak_supervision.dataloader import DataLoaderEvalICDAR2013
 from src.utils.parallel import DataParallelModel
 from src.utils.utils import generate_word_bbox, get_weighted_character_target
 
@@ -31,7 +30,7 @@ def seed():
 	torch.backends.cudnn.deterministic = True
 
 
-def synthesize(dataloader, model, base_path_affinity, base_path_character):
+def synthesize(dataloader, model, base_path_affinity, base_path_character, base_path_bbox):
 
 	"""
 
@@ -41,6 +40,7 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character):
 	:param model: A pre-trained model
 	:param base_path_affinity: Path where to store the predicted affinity heatmap
 	:param base_path_character: Path where to store the predicted character heatmap
+	:param base_path_bbox: Path where to store the word_bbox overlapped on images
 	:return: None
 	"""
 
@@ -68,17 +68,48 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character):
 
 				# --------- Resizing it back to the original image size and saving it ----------- #
 
+				image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
+
 				max_dim = original_dim[i].max()
 				resizing_factor = 768/max_dim
 				before_pad_dim = [int(original_dim[i][0]*resizing_factor), int(original_dim[i][1]*resizing_factor)]
 
 				output[i, :, :, :] = np.uint8(output[i, :, :, :]*255)
 
-				character_bbox = cv2.resize(output[i, 0, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
-				affinity_bbox = cv2.resize(output[i, 1, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
+				height_pad = (768 - before_pad_dim[0])//2
+				width_pad = (768 - before_pad_dim[1])//2
+
+				image_i = cv2.resize(
+					image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0])
+				)
+
+				character_bbox = cv2.resize(
+					output[i, 0, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0])
+				)/255
+
+				affinity_bbox = cv2.resize(
+					output[i, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0])
+				)/255
+
+				predicted_bbox = generate_word_bbox(
+					character_bbox,
+					affinity_bbox,
+					character_threshold=config.threshold_character,
+					affinity_threshold=config.threshold_affinity)['word_bbox']
+
+				predicted_bbox = [np.array(predicted_bbox_i) for predicted_bbox_i in predicted_bbox]
+
+				cv2.drawContours(image_i, predicted_bbox, -1, (0, 255, 0), 2)
 
 				plt.imsave(
-					base_path_character+'/'+'.'.join(image_name[i].split('.')[:-1])+'.png',
+					base_path_bbox + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.png',
+					image_i)
+
+				plt.imsave(
+					base_path_character + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.png',
 					np.float32(character_bbox > config.threshold_character),
 					cmap='gray')
 
@@ -127,17 +158,37 @@ def synthesize_with_score(dataloader, model, base_target_path):
 
 				# --------- Resizing it back to the original image size and saving it ----------- #
 
+				image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
+
 				max_dim = original_dim[i].max()
 				resizing_factor = 768/max_dim
 				before_pad_dim = [int(original_dim[i][0]*resizing_factor), int(original_dim[i][1]*resizing_factor)]
 
-				plt.imsave(base_target_path + '_affinity'+'/'+'.'.join(image_name[i].split('.')[:-1])+'.png', np.float32(output[i, 1, :, :] > config.threshold_affinity), cmap='gray')
-				plt.imsave(base_target_path + '_character'+'/'+'.'.join(image_name[i].split('.')[:-1])+'.png', np.float32(output[i, 0, :, :] > config.threshold_character), cmap='gray')
+				plt.imsave(
+					base_target_path + '_affinity/'+'.'.join(image_name[i].split('.')[:-1])+'.png',
+					np.float32(output[i, 1, :, :] > config.threshold_affinity),
+					cmap='gray')
+				plt.imsave(
+					base_target_path + '_character/'+'.'.join(image_name[i].split('.')[:-1])+'.png',
+					np.float32(output[i, 0, :, :] > config.threshold_character), cmap='gray')
 
 				output[i, :, :, :] = np.uint8(output[i, :, :, :]*255)
 
-				character_bbox = cv2.resize(output[i, 0, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
-				affinity_bbox = cv2.resize(output[i, 1, (768 - before_pad_dim[0])//2:(768 - before_pad_dim[0])//2+ before_pad_dim[0], (768 - before_pad_dim[1])//2:(768 - before_pad_dim[1])//2 + before_pad_dim[1]], (original_dim[i][1], original_dim[i][0]))/255
+				height_pad = (768 - before_pad_dim[0]) // 2
+				width_pad = (768 - before_pad_dim[1]) // 2
+
+				image_i = cv2.resize(
+					image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0])
+				)
+
+				character_bbox = cv2.resize(
+					output[i, 0, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0]))/255
+
+				affinity_bbox = cv2.resize(
+					output[i, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0]))/255
 
 				generated_targets = generate_word_bbox(
 					character_bbox, affinity_bbox,
@@ -154,17 +205,28 @@ def synthesize_with_score(dataloader, model, base_target_path):
 					dataloader.dataset.unknown,
 					config.threshold_fscore)
 
+				cv2.drawContours(image_i, [np.array(word_bbox) for word_bbox in generated_targets['word_bbox']], -1, (0, 255, 0), 2)
+
+				plt.imsave(base_target_path + '_word_bbox/'+'.'.join(image_name[i].split('.')[:-1])+'.png', image_i)
+
 				with open(base_target_path + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.json', 'w') as f:
 					json.dump(generated_targets, f)
 
 
-def main(folder_path, base_path_character=None, base_path_affinity=None, model_path=None, model=None):
+def main(
+		folder_path,
+		base_path_character=None,
+		base_path_affinity=None,
+		base_path_bbox=None,
+		model_path=None,
+		model=None):
 
 	"""
-	Entry function for synthesising character and affinity heatmaps on images given in a folder using a pre-trained model
+	Entry function for synthesising character and affinity heatmap on images given in a folder using a pre-trained model
 	:param folder_path: Path of folder where the images are
 	:param base_path_character: Path where to store the character heatmap
 	:param base_path_affinity: Path where to store the affinity heatmap
+	:param base_path_bbox: Path where to store the generated word_bbox overlapped on the image
 	:param model_path: Path where the pre-trained model is stored
 	:param model: If model is provided directly use it instead of loading it
 	:return:
@@ -172,11 +234,14 @@ def main(folder_path, base_path_character=None, base_path_affinity=None, model_p
 
 	os.makedirs(base_path_affinity, exist_ok=True)
 	os.makedirs(base_path_character, exist_ok=True)
+	os.makedirs(base_path_bbox, exist_ok=True)
 
 	if base_path_character is None:
 		base_path_character = '/'.join(folder_path.split('/')[:-1])+'/target_character'
 	if base_path_affinity is None:
 		base_path_affinity = '/'.join(folder_path.split('/')[:-1])+'/target_affinity'
+	if base_path_bbox is None:
+		base_path_bbox = '/'.join(folder_path.split('/')[:-1])+'/word_bbox'
 
 	# Dataloader to pre-process images given in the folder
 
@@ -193,16 +258,20 @@ def main(folder_path, base_path_character=None, base_path_affinity=None, model_p
 		model = UNetWithResnet50Encoder()
 		model = DataParallelModel(model)
 
+		# ToDo - Can't run pre-trained models on CPU
+
 		if config.use_cuda:
 			model = model.cuda()
 
 		saved_model = torch.load(model_path)
 		model.load_state_dict(saved_model['state_dict'])
 
-	synthesize(infer_dataloader, model, base_path_affinity, base_path_character)
+	synthesize(infer_dataloader, model, base_path_affinity, base_path_character, base_path_bbox)
 
 
-def generator(base_target_path, model_path=None, model=None):
+def generator_(base_target_path, model_path=None, model=None):
+
+	from train_weak_supervision.dataloader import DataLoaderEvalICDAR2013
 
 	"""
 	Generator function to generate weighted heat-maps for weak-supervision training
@@ -215,6 +284,7 @@ def generator(base_target_path, model_path=None, model=None):
 	os.makedirs(base_target_path, exist_ok=True)
 	os.makedirs(base_target_path+'_affinity', exist_ok=True)
 	os.makedirs(base_target_path+'_character', exist_ok=True)
+	os.makedirs(base_target_path+'_word_bbox', exist_ok=True)
 
 	# Dataloader to pre-process images given in the dataset and provide annotations to generate weight
 

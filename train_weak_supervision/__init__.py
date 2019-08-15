@@ -1,7 +1,7 @@
 from .trainer import train
 from src.model import UNetWithResnet50Encoder
 import train_weak_supervision.config as config
-from train_synth.synthesize import generator
+from train_synth.synthesize import generator_
 from src.utils.parallel import DataParallelModel
 import torch
 
@@ -38,7 +38,7 @@ def generate_target(model, iteration):
 	:return: None
 	"""
 
-	generator(base_target_path=config.target_path+'/'+str(iteration), model=model)
+	generator_(base_target_path=config.target_path + '/' + str(iteration), model=model)
 	torch.cuda.empty_cache()
 
 
