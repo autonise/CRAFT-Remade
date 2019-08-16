@@ -37,7 +37,9 @@ def save(data, output, target, target_affinity, epoch, no):
 	base = config.DataLoaderICDAR2013_Synthesis + str(epoch) + '_' + str(no) + '/'
 
 	os.makedirs(base, exist_ok=True)
+
 	for i in range(batch_size):
+
 		os.makedirs(base+str(i), exist_ok=True)
 		character_bbox = output[i, 0, :, :]
 		affinity_bbox = output[i, 1, :, :]
@@ -72,7 +74,7 @@ def train(model, optimizer, iteration):
 	:return: model, optimizer
 	"""
 
-	dataloader = DataLoader(DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=8)
+	dataloader = DataLoader(DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=0)
 	loss_criterian = DataParallelCriterion(Criterian())
 
 	model.train()
@@ -149,7 +151,10 @@ def train(model, optimizer, iteration):
 			affinity_threshold=config.threshold_affinity)
 
 		all_accuracy.append(
-			calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore))
+			calculate_batch_fscore(
+				predicted_bbox,
+				target_bbox,
+				threshold=config.threshold_fscore))
 
 	torch.cuda.empty_cache()
 

@@ -9,6 +9,7 @@ import train_synth.config as config
 	globally generating gaussian heatmap which will be warped for every character bbox
 """
 
+
 sigma = 10
 spread = 3
 extent = int(spread * sigma)
@@ -22,6 +23,25 @@ for i_ in range(int(extent*mult)):
 			-1 / 2 * ((i_ - center - 0.5) ** 2 + (j_ - center - 0.5) ** 2) / (sigma ** 2))
 
 gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
+
+
+def order_points(pts):
+
+	"""
+	Orders the 4 co-ordinates of a bounding box, top-left, top-right, bottom-right, bottom-left
+	:param pts: numpy array with shape [4, 2]
+	:return: numpy array, shape = [4, 2], ordered bbox
+	"""
+
+	rect = np.zeros((4, 2), dtype="float32")
+	s = pts.sum(axis=1)
+	rect[0] = pts[np.argmin(s)]
+	rect[2] = pts[np.argmax(s)]
+	diff = np.diff(pts, axis=1)
+	rect[1] = pts[np.argmin(diff)]
+	rect[3] = pts[np.argmax(diff)]
+
+	return rect
 
 
 def four_point_transform(image, pts):
@@ -78,13 +98,13 @@ def resize(image, character, side=768):
 	return big_image, character
 
 
-def resize_generated(image, character, side=768):
+def resize_generated(image, character, affinity, side=768):
 	"""
 		Resizing the image while maintaining the aspect ratio and padding with average of the entire image to make the
 		reshaped size = (side, side)
 		:param image: np.array, dtype=np.uint8, shape=[height, width, 3]
-		ToDo - Find the exact dimensions of the character bbox and merge resize and resize_generated functions
-		:param character: np.array, dtype=np.int32 or np.float32, shape = [something, something, 2]
+		:param character: list of np.array, dtype=np.int64, shape = [num_words, num_characters, 4, 1, 2]
+		:param affinity: list of np.array, dtype=np.int64, shape = [num_words, num_affinity, 4, 1, 2]
 		:param side: new size to be reshaped to
 		:return: resized_image, corresponding reshaped character bbox
 	"""
@@ -94,10 +114,12 @@ def resize_generated(image, character, side=768):
 	new_resize = (int(width/max_side*side), int(height/max_side*side))
 	image = cv2.resize(image, new_resize)
 
-	for i in range(len(character)):
+	for word_no in range(len(character)):
 
-		character[i][:, :, 0] = character[i][:, :, 0]/width*new_resize[0]
-		character[i][:, :, 1] = character[i][:, :, 1]/height*new_resize[1]
+		character[word_no][:, :, :, 0] = character[word_no][:, :, :, 0] / width * new_resize[0]
+		character[word_no][:, :, :, 1] = character[word_no][:, :, :, 1] / height * new_resize[1]
+		affinity[word_no][:, :, :, 0] = affinity[word_no][:, :, :, 0] / width * new_resize[0]
+		affinity[word_no][:, :, :, 1] = affinity[word_no][:, :, :, 1] / height * new_resize[1]
 
 	big_image = np.ones([side, side, 3], dtype=np.float32)*np.mean(image)
 	big_image[
@@ -105,11 +127,14 @@ def resize_generated(image, character, side=768):
 		(side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
 	big_image = big_image.astype(np.uint8)
 
-	for i in range(len(character)):
-		character[i][:, :, 0] += (side-image.shape[1])//2
-		character[i][:, :, 1] += (side-image.shape[0])//2
+	for word_no in range(len(character)):
 
-	return big_image, character
+		character[word_no][:, :, :, 0] += (side - image.shape[1]) // 2
+		character[word_no][:, :, :, 1] += (side - image.shape[0]) // 2
+		affinity[word_no][:, :, :, 0] += (side - image.shape[1]) // 2
+		affinity[word_no][:, :, :, 1] += (side - image.shape[0]) // 2
+
+	return big_image, character, affinity
 
 
 def add_character(image, bbox):
@@ -205,6 +230,9 @@ def add_affinity(image, bbox_1, bbox_2):
 		:return: image in which the gaussian affinity bbox has been added
 	"""
 
+	bbox_1 = order_points(bbox_1)
+	bbox_2 = order_points(bbox_2)
+
 	backup = image.copy()
 
 	try:
@@ -227,6 +255,29 @@ def add_affinity(image, bbox_1, bbox_2):
 		return backup
 
 
+def two_char_bbox_to_affinity(bbox_1, bbox_2):
+
+	"""
+	Given two character bbox generates the co-ordinates of the affinity bbox between them
+	:param bbox_1: type=np.array, dtype=np.int64, shape = [4, 1, 2]
+	:param bbox_2: type=np.array, dtype=np.int64, shape = [4, 1, 2]
+	:return: affinity bbox, type=np.array, dtype=np.int64, shape = [4, 1, 2]
+	"""
+
+	bbox_1 = bbox_1[:, 0, :].copy()
+	bbox_2 = bbox_2[:, 0, :].copy()
+
+	center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
+	tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
+	bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
+	tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
+	br = np.mean([bbox_2[2], bbox_2[3], center_2], axis=0)
+
+	affinity = np.array([tl, tr, br, bl]).reshape([4, 1, 2])
+
+	return affinity
+
+
 def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 
 	"""
@@ -240,17 +291,13 @@ def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 					weight_map in which the weight as per weak-supervision has been calculated
 	"""
 
+	bbox_1 = order_points(bbox_1)
+	bbox_2 = order_points(bbox_2)
 	backup = image.copy(), weight.copy()
 
 	try:
 
-		center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
-		tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
-		bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
-		tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
-		br = np.mean([bbox_2[2], bbox_2[3], center_2], axis=0)
-
-		affinity = np.array([tl, tr, br, bl])
+		affinity = two_char_bbox_to_affinity(bbox_1, bbox_2)
 
 		return add_character_others(image, weight, weight_val, affinity)
 
@@ -302,7 +349,10 @@ def generate_target_others(image_size, character_bbox, weight):
 
 	# ToDo - Merge generate_target and generate_target_others. One is for synth-text and the other is for icdar 2013
 
-	channel, height, width = image_size
+	if len(image_size) == 2:
+		height, width = image_size
+	else:
+		channel, height, width = image_size
 
 	target = np.zeros([height, width], dtype=np.uint8)
 	weight_map = np.zeros([height, width], dtype=np.float32)
@@ -311,7 +361,7 @@ def generate_target_others(image_size, character_bbox, weight):
 
 		for i in range(character_bbox[word_no].shape[0]):
 
-			target, weight_map = add_character_others(target, weight_map, weight[word_no], character_bbox[word_no][i].copy())
+			target, weight_map = add_character_others(target, weight_map, weight[word_no], character_bbox[word_no][i].copy()[:, 0, :])
 
 	return target/255, weight_map
 
@@ -334,7 +384,10 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 
 	character_bbox = character_bbox.transpose(2, 1, 0)
 
-	channel, height, width = image_size
+	if len(image_size) == 2:
+		height, width = image_size
+	else:
+		channel, height, width = image_size
 
 	target = np.zeros([height, width], dtype=np.uint8)
 
@@ -368,20 +421,22 @@ def generate_affinity_others(image_size, character_bbox, weight):
 
 	# ToDo - merge the generate_affinity function with generate_affinity_others function
 
-	channel, height, width = image_size
+	if len(image_size) == 2:
+		height, width = image_size
+	else:
+		channel, height, width = image_size
 
 	target = np.zeros([height, width], dtype=np.uint8)
 	weight_map = np.zeros([height, width], dtype=np.float32)
 
 	for i, word in enumerate(character_bbox):
-
 		for char_num in range(len(word)-1):
 			target, weight_map = add_affinity_others(
 				target,
 				weight_map,
 				weight[i],
-				word[char_num].copy(),
-				word[char_num+1].copy())
+				word[char_num][:, 0, :].copy(),
+				word[char_num+1][:, 0, :].copy())
 
 	return target/255, weight_map
 
@@ -478,7 +533,7 @@ class DataLoaderEval(data.Dataset):
 	def __init__(self, path):
 
 		self.base_path = path
-		self.imnames = os.listdir(self.base_path)
+		self.imnames = sorted(os.listdir(self.base_path))
 
 	def __getitem__(self, item):
 
