@@ -7,13 +7,26 @@
 - [ ] Generate character bbox on all the popular data sets.
 - [ ] Expose pre-trained models with command line interface to synthesize results on custom images
 
+
+## Cone the repository
+
+    git clone https://github.com/autonise/CRAFT-Remade.git
+    cd CRAFT-Remade
+
+## Option 1: Conda Environment Installation
+    conda env create -f environment.yml
+    conda activate craft
+
+## Option 2: Pip Installation
+    pip install -r requirements.txt
+
 ## Running on custom images
 
 Put the images inside a folder.
 <br>Get a pre-trained model from the pre-trained model list (Currently only strong supervision using SYNTH-Text available)
 <br>Run the command - 
 
-    python main.py train_synth --mode=synthesize --model=/path/to/model --folder=/path/to/images/
+    python main.py train_synth --mode=synthesize --model=./model/final_model.pkl --folder=./input
     
 ## Pre-trained models
 
