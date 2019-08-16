@@ -1,11 +1,14 @@
 import train_synth.config as config
 from src.model import UNetWithResnet50Encoder
-from train_synth.dataloader import DataLoaderEval
+
 from src.utils.parallel import DataParallelModel
 from src.utils.utils import generate_word_bbox, get_weighted_character_target
 
-import cv2
-import json
+
+
+from src.utils.utils import calculate_batch_fscore
+from train_synth.dataloader import DataLoaderEval, DataLoaderEvalICDAR2013
+
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
@@ -13,6 +16,17 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+
+from src.utils.parallel import DataParallelModel
+from src.utils.utils import generate_bbox, get_weighted_character_target
+from shapely.geometry import box, Polygon
+import cv2
+import json
+
+
+
+DATA_DEBUG = False
+
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)  # Specify which GPU you want to use
 
@@ -209,6 +223,9 @@ def synthesize_with_score(dataloader, model, base_target_path):
 
 				plt.imsave(base_target_path + '_word_bbox/'+'.'.join(image_name[i].split('.')[:-1])+'.png', image_i)
 
+				f_score=calculate_batch_fscore(generated_targets,original_annotations[i])
+
+				dataloader.set_description(f_score)
 				with open(base_target_path + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.json', 'w') as f:
 					json.dump(generated_targets, f)
 

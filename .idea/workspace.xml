@@ -3,11 +3,15 @@
   <component name="ChangeListManager">
     <list default="true" id="119932cc-1b58-48ee-bc3e-1c17fe5770fd" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+<<<<<<< HEAD
       <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_synth/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_synth/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/dataloader.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_synth/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/train.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" afterDir="false" />
+=======
+      <change beforePath="$PROJECT_DIR$/train_synth/synthesize.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/synthesize.py" afterDir="false" />
+>>>>>>> 6f88e785b7916bb61ce9960b8b265f12fe3f25f6
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -30,8 +34,13 @@
   <component name="PropertiesComponent">
     <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+<<<<<<< HEAD
     <property name="full.screen.before.presentation.mode" value="false" />
     <property name="settings.editor.selected.configurable" value="preferences.lookFeel" />
+=======
+    <property name="last_opened_file_path" value="$USER_HOME$" />
+    <property name="settings.editor.selected.configurable" value="editor.preferences.tabs" />
+>>>>>>> 6f88e785b7916bb61ce9960b8b265f12fe3f25f6
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">

@@ -6,6 +6,7 @@
       <option name="ignoredErrors">
         <list>
           <option value="W191" />
+<<<<<<< HEAD
           <option value="E722" />
         </list>
       </option>
@@ -23,6 +24,10 @@
         <list>
           <option value="torch.cat" />
           <option value="torch.backends.cudnn" />
+=======
+          <option value="W29" />
+          <option value="E501" />
+>>>>>>> 6f88e785b7916bb61ce9960b8b265f12fe3f25f6
         </list>
       </option>
     </inspection_tool>
