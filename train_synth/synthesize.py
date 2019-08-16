@@ -183,6 +183,8 @@ def synthesize_with_score(dataloader, model, base_target_path):
 					output[i, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
 					(original_dim[i][1], original_dim[i][0]))/255
 
+				# ToDo - generate_word_bbox should also return affinity bbox
+
 				generated_targets = generate_word_bbox(
 					character_bbox, affinity_bbox,
 					character_threshold=config.threshold_character,
@@ -195,7 +197,7 @@ def synthesize_with_score(dataloader, model, base_target_path):
 				)
 				cv2.drawContours(
 					image_i,
-					[np.array(word_bbox) for word_bbox in generated_targets['word_bbox']], -1, (0, 255, 0), 2)
+					[np.array(word_bbox).astype(np.int32) for word_bbox in generated_targets['word_bbox']], -1, (0, 255, 0), 2)
 
 				plt.imsave(base_target_path + '_predicted/word_bbox/'+'.'.join(image_name[i].split('.')[:-1])+'.png', image_i)
 
@@ -216,16 +218,16 @@ def synthesize_with_score(dataloader, model, base_target_path):
 				)
 				cv2.drawContours(
 					image_i,
-					[np.array(word_bbox) for word_bbox in generated_targets['word_bbox']], -1, (0, 255, 0), 2)
+					[np.array(word_bbox).astype(np.int32) for word_bbox in generated_targets['word_bbox']], -1, (0, 255, 0), 2)
 
 				plt.imsave(
 					base_target_path + '_next_target/word_bbox/' + '.'.join(image_name[i].split('.')[:-1]) + '.png',
 					image_i)
 
 				# Generate affinity heatmap
-				affinity_target, affinity_weight_map = generate_affinity_others(
+				affinity_target, affinity_weight_map = generate_target_others(
 					(image_i.shape[0], image_i.shape[1]),
-					[np.array(i) for i in generated_targets['characters'].copy()],
+					[np.array(i) for i in generated_targets['affinity'].copy()],
 					generated_targets['weights'].copy())
 
 				# Generate character heatmap
@@ -347,8 +349,8 @@ def generator_(base_target_path, model_path=None, model=None):
 	infer_dataloader = DataLoaderEvalICDAR2013()
 
 	infer_dataloader = DataLoader(
-		infer_dataloader, batch_size=1,
-		shuffle=False, num_workers=0)
+		infer_dataloader, batch_size=config.batch_size['test'],
+		shuffle=False, num_workers=3)
 
 	if model is None:
 

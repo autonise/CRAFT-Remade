@@ -10,7 +10,7 @@ from train_synth.dataloader import resize, resize_generated
 from train_synth.dataloader import generate_affinity, generate_target, generate_target_others, generate_affinity_others
 
 
-DEBUG = False
+DEBUG = True
 
 
 class DataLoaderMIX(data.Dataset):
@@ -105,15 +105,20 @@ class DataLoaderMIX(data.Dataset):
 
 			image = plt.imread(self.base_path_other_images+'/'+self.gt[item % len(self.gt)][0])  # Read the image
 			character = [np.array(char_i) for char_i in self.gt[item % len(self.gt)][1]['characters']]
-			image, character = resize_generated(image, character.copy())  # Resize the image to (768, 768)
+			affinity = [np.array(char_i) for char_i in self.gt[item % len(self.gt)][1]['affinity']]
+
+			# Resize the image to (768, 768)
+			image, character_affinity = resize_generated(image, character.copy()+affinity.copy())
+			character = character_affinity[0:len(self.gt[item % len(self.gt)][1]['characters'])]
+			affinity = character_affinity[len(self.gt[item % len(self.gt)][1]['characters']):]
 			image = image.transpose(2, 0, 1) / 255
 			weights = [i for i in self.gt[item % len(self.gt)][1]['weights']]
 
 			# Generate character heatmap with weights
-			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights)
+			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights.copy())
 
 			# Generate affinity heatmap with weights
-			weight_affinity, weak_supervision_affinity = generate_affinity_others(image.shape, character.copy(), weights)
+			weight_affinity, weak_supervision_affinity = generate_target_others(image.shape, affinity.copy(), weights.copy())
 
 		return \
 			image.astype(np.float32), \

@@ -2,6 +2,12 @@ from shapely.geometry import Polygon
 import numpy as np
 import cv2
 import networkx as nx
+from train_synth.dataloader import two_char_bbox_to_affinity
+
+
+def poly_to_rect(bbox_contour):
+
+	return cv2.boxPoints(cv2.minAreaRect(np.array(bbox_contour, dtype=np.int32).squeeze())).reshape([4, 1, 2])
 
 
 def weighing_function(orig_length, cur_length):
@@ -44,20 +50,27 @@ def cutter(word_bbox, num_characters):
 	character_width = width/num_characters
 
 	char_bbox = np.zeros([num_characters, 4, 2])
+	affinity_bbox = np.zeros([num_characters - 1, 4, 2])
 	co_ordinates = np.zeros([num_characters + 1, 2, 2])
 
 	co_ordinates[0, 0] = word_bbox[width1_0]
 	co_ordinates[0, 1] = word_bbox[width2_0]
 
 	for i in range(1, num_characters + 1):
+
 		co_ordinates[i, 0] = co_ordinates[i - 1, 0] + direction*character_width
 		co_ordinates[i, 1] = co_ordinates[i - 1, 1] + direction*character_width
+
 		char_bbox[i-1, 0] = co_ordinates[i - 1, 0]
 		char_bbox[i-1, 1] = co_ordinates[i, 0]
 		char_bbox[i-1, 2] = co_ordinates[i, 1]
 		char_bbox[i-1, 3] = co_ordinates[i - 1, 1]
 
-	return char_bbox
+	for i in range(num_characters - 1):
+
+		affinity_bbox[i] = two_char_bbox_to_affinity(char_bbox[i], char_bbox[i+1])
+
+	return char_bbox, affinity_bbox
 
 
 def get_weighted_character_target(generated_targets, original_annotation, unknown_symbol, threshold):
@@ -89,6 +102,7 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 	aligned_generated_targets = {
 		'word_bbox': original_annotation['bbox'],
 		'characters': [[] for _ in original_annotation['text']],
+		'affinity': [[] for _ in original_annotation['text']],
 		'text': original_annotation['text'],
 		'weights': [0 for _ in original_annotation['text']]
 	}
@@ -114,8 +128,10 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 			# ToDo - What should be done in this scenario?
 			#  If not found and unknown_symbol is there this will create problems
 
-			characters = cutter(orig_annot, len(original_annotation['text'][orig_no]))
+			characters, affinity = cutter(orig_annot, len(original_annotation['text'][orig_no]))
+
 			aligned_generated_targets['characters'][orig_no] = characters.astype(np.int32).tolist()
+			aligned_generated_targets['affinity'][orig_no] = affinity.astype(np.int32).tolist()
 			aligned_generated_targets['weights'][orig_no] = 0.5
 
 		elif original_annotation['text'][orig_no] == unknown_symbol:
@@ -126,7 +142,9 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 			"""
 
 			aligned_generated_targets['weights'][orig_no] = 0.5
-			aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
+			aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no].tolist()
+			aligned_generated_targets['affinity'][orig_no] = generated_targets['affinity'][found_no].tolist()
+
 		else:
 
 			"""
@@ -139,12 +157,15 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 			weight = weighing_function(len(original_annotation['text'][orig_no]), len(generated_targets['characters'][found_no]))
 
 			if weight < 0.5:
-				characters = cutter(orig_annot, len(original_annotation['text'][orig_no]))
+				characters, affinity = cutter(orig_annot, len(original_annotation['text'][orig_no]))
+
 				aligned_generated_targets['characters'][orig_no] = characters.astype(np.int32).tolist()
+				aligned_generated_targets['affinity'][orig_no] = affinity.astype(np.int32).tolist()
 				aligned_generated_targets['weights'][orig_no] = 0.5
 			else:
 				aligned_generated_targets['weights'][orig_no] = weight
-				aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
+				aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no].tolist()
+				aligned_generated_targets['affinity'][orig_no] = generated_targets['affinity'][found_no].tolist()
 
 	return aligned_generated_targets
 
@@ -235,13 +256,16 @@ def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold,
 
 	# The function join_with_characters joins the character_bbox using affinity_bbox to create word-bbox
 
-	all_word_bbox, all_characters_bbox = join(all_characters, all_joins, return_characters=True)
-	word_bbox = [i.tolist() for i in np.array(all_word_bbox)]
-	char_bbox = [i.tolist() for i in np.array(all_characters_bbox)]
+	all_word_bbox, all_characters_bbox, all_affinity_bbox = join(all_characters, all_joins, return_characters=True)
+
+	word_bbox = np.array([poly_to_rect(i).tolist() for i in np.array(all_word_bbox)])
+	char_bbox = np.array([poly_to_rect(i).tolist() for i in np.array(all_characters_bbox)])
+	affinity_bbox = np.array([poly_to_rect(i).tolist() for i in np.array(all_affinity_bbox)])
 
 	return {
 		'word_bbox': word_bbox,
-		'characters': char_bbox
+		'characters': char_bbox,
+		'affinity': affinity_bbox
 	}
 
 
@@ -275,28 +299,9 @@ def generate_word_bbox_batch(batch_character_heatmap, batch_affinity_heatmap, ch
 		if 'error_message' in returned.keys():
 			word_bbox.append(np.zeros([0]))
 
-		word_bbox.append(np.array(returned['word_bbox']))
+		word_bbox.append(returned['word_bbox'])
 
 	return word_bbox
-
-
-def order_points(pts):
-
-	"""
-	Orders the 4 co-ordinates of a bounding box, top-left, top-right, bottom-right, bottom-left
-	:param pts: numpy array with shape [4, 2]
-	:return: numpy array, shape = [4, 2], ordered bbox
-	"""
-
-	rect = np.zeros((4, 2), dtype="float32")
-	s = pts.sum(axis=1)
-	rect[0] = pts[np.argmin(s)]
-	rect[2] = pts[np.argmax(s)]
-	diff = np.diff(pts, axis=1)
-	rect[1] = pts[np.argmin(diff)]
-	rect[3] = pts[np.argmax(diff)]
-
-	return rect
 
 
 def calc_iou(poly1, poly2):
@@ -424,6 +429,7 @@ def get_smooth_polygon(word_contours):
 		convex_hull = np.repeat(convex_hull, 4, axis=0)
 	if convex_hull.shape[0] == 2:
 		convex_hull = np.repeat(convex_hull, 2, axis=0)
+
 	return convex_hull
 
 
@@ -458,6 +464,7 @@ def join(characters, joints, return_characters=False):
 	all_words = nx.connected_components(graph)
 	all_word_contours = []
 	all_character_contours = []
+	all_affinity_contours = []
 
 	for word_idx in all_words:
 
@@ -465,68 +472,19 @@ def join(characters, joints, return_characters=False):
 			continue
 
 		all_word_contours.append(get_smooth_polygon(all_joined[list(word_idx)]))
-
-		edges = np.array(list(graph.subgraph(nx.shortest_path(graph, list(word_idx)[0]).keys()).edges()))
-
-		values, count = np.unique(np.array(edges).ravel(), return_counts=True)
-
-		print(values, count, word_idx, edges)
-
-		if values.shape[0] == 0:
-			all_character_contours.append(
-				all_joined[list(word_idx)[0]])
-			continue
-		else:
-			start = values[np.where(count == 1)[0][0]]
-
-		def check_in(value, array, current_done):
-
-			all_found = []
-
-			for i_, array_i in enumerate(array):
-				for j_, array_j in enumerate(array_i):
-					if value == array_j:
-						if current_done[i_] == 0:
-							all_found.append([i_, array_i[(j_ + 1) % 2]])
-							current_done[i_] = 1
-
-			return all_found, current_done
-
-		def dist_contour(cont1, cont2):
-
-			return np.sqrt(np.sum(np.square(np.mean(cont1, axis=0) - np.mean(cont2, axis=0))))
-
-		sequential_characters_affinity = [start]
-
-		done = np.zeros([edges.shape[0]])
-
-		for _ in range(edges.copy().shape[0] - 1):
-
-			found, done = check_in(sequential_characters_affinity[-1], edges, done)
-			print(found)
-			assert len(found) != 0, 'Some problem in finding connected components'
-
-			min_dist = dist_contour(all_joined[found[0][1]], all_joined[sequential_characters_affinity[-1]])
-			partner = found[0][1]
-
-			for __ in range(1, len(found)):
-
-				cur_dist = dist_contour(all_joined[found[__][1]], all_joined[sequential_characters_affinity[-1]])
-
-				if cur_dist < min_dist:
-					min_dist = cur_dist
-					partner = found[__][1]
-
-				# edges = np.delete(edges, found[__][0], axis=0)
-
-			sequential_characters_affinity.append(partner)
-
 		all_character_contours.append(
-			all_joined[
-				np.array(sequential_characters_affinity)[
-					list(np.where(np.array(sequential_characters_affinity) < len(characters)))[0]]])
+			get_smooth_polygon(all_joined[
+				np.array(list(word_idx))[
+					list(np.where(np.array(list(word_idx)) < len(characters)))[0]]]))
+		if len(all_joined[np.array(list(word_idx))[list(np.where(np.array(list(word_idx)) >= len(characters)))[0]]]) != 0:
+			all_affinity_contours.append(
+				get_smooth_polygon(all_joined[
+					np.array(list(word_idx))[
+						list(np.where(np.array(list(word_idx)) >= len(characters)))[0]]]))
+		else:
+			all_affinity_contours.append(np.zeros([4, 1, 2]))
 
 	if return_characters:
-		return all_word_contours, all_character_contours
+		return all_word_contours, all_character_contours, all_affinity_contours
 	else:
 		return all_word_contours

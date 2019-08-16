@@ -4,11 +4,11 @@ import numpy as np
 import cv2
 import os
 import train_synth.config as config
-from src.utils.utils import order_points
 
 """
 	globally generating gaussian heatmap which will be warped for every character bbox
 """
+
 
 sigma = 10
 spread = 3
@@ -23,6 +23,25 @@ for i_ in range(int(extent*mult)):
 			-1 / 2 * ((i_ - center - 0.5) ** 2 + (j_ - center - 0.5) ** 2) / (sigma ** 2))
 
 gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
+
+
+def order_points(pts):
+
+	"""
+	Orders the 4 co-ordinates of a bounding box, top-left, top-right, bottom-right, bottom-left
+	:param pts: numpy array with shape [4, 2]
+	:return: numpy array, shape = [4, 2], ordered bbox
+	"""
+
+	rect = np.zeros((4, 2), dtype="float32")
+	s = pts.sum(axis=1)
+	rect[0] = pts[np.argmin(s)]
+	rect[2] = pts[np.argmax(s)]
+	diff = np.diff(pts, axis=1)
+	rect[1] = pts[np.argmin(diff)]
+	rect[3] = pts[np.argmax(diff)]
+
+	return rect
 
 
 def four_point_transform(image, pts):
@@ -231,6 +250,19 @@ def add_affinity(image, bbox_1, bbox_2):
 		return backup
 
 
+def two_char_bbox_to_affinity(bbox_1, bbox_2):
+
+	center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
+	tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
+	bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
+	tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
+	br = np.mean([bbox_2[2], bbox_2[3], center_2], axis=0)
+
+	affinity = np.array([tl, tr, br, bl])
+
+	return affinity
+
+
 def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 
 	"""
@@ -250,13 +282,7 @@ def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 
 	try:
 
-		center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
-		tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
-		bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
-		tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
-		br = np.mean([bbox_2[2], bbox_2[3], center_2], axis=0)
-
-		affinity = np.array([tl, tr, br, bl])
+		affinity = two_char_bbox_to_affinity(bbox_1, bbox_2)
 
 		return add_character_others(image, weight, weight_val, affinity)
 

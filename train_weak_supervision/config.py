@@ -22,7 +22,7 @@ ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
 
 batch_size = {
 	'train': 2,
-	'test': 1,
+	'test': 3,
 }
 
 lr = {
