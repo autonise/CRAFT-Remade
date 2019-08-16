@@ -19,23 +19,23 @@ Put the images inside a folder.
 
 ### Strong Supervision
 
-    SYNTHTEXT - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T
+SynthText - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<br>
     
 ### Weak Supervision
 
-    - [ ] ICDAR 2013 - yet_to_be_completed
-    - [ ] ICDAR 2015 - yet_to_be_completed
-    - [ ] ICDAR 2017 - yet_to_be_completed
-    - [ ] Total Text - yet_to_be_completed
-    - [ ] MS-COCO - yet_to_be_completed
+- [ ] ICDAR 2013 - yet_to_be_completed
+- [ ] ICDAR 2015 - yet_to_be_completed
+- [ ] ICDAR 2017 - yet_to_be_completed
+- [ ] Total Text - yet_to_be_completed
+- [ ] MS-COCO - yet_to_be_completed
     
 ## Pre-generated on popular data sets
 
-    - [ ] ICDAR 2013 - yet_to_be_completed
-    - [ ] ICDAR 2015 - yet_to_be_completed
-    - [ ] ICDAR 2017 - yet_to_be_completed
-    - [ ] Total Text - yet_to_be_completed
-    - [ ] MS-COCO - yet_to_be_completed
+- [ ] ICDAR 2013 - yet_to_be_completed
+- [ ] ICDAR 2015 - yet_to_be_completed
+- [ ] ICDAR 2017 - yet_to_be_completed
+- [ ] Total Text - yet_to_be_completed
+- [ ] MS-COCO - yet_to_be_completed
     
 ## How to train on your own dataset
 

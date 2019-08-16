@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import os
 import train_synth.config as config
+from src.utils.utils import order_points
 
 """
 	globally generating gaussian heatmap which will be warped for every character bbox
@@ -205,6 +206,9 @@ def add_affinity(image, bbox_1, bbox_2):
 		:return: image in which the gaussian affinity bbox has been added
 	"""
 
+	bbox_1 = order_points(bbox_1)
+	bbox_2 = order_points(bbox_2)
+
 	backup = image.copy()
 
 	try:
@@ -240,6 +244,8 @@ def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 					weight_map in which the weight as per weak-supervision has been calculated
 	"""
 
+	bbox_1 = order_points(bbox_1)
+	bbox_2 = order_points(bbox_2)
 	backup = image.copy(), weight.copy()
 
 	try:
@@ -302,7 +308,10 @@ def generate_target_others(image_size, character_bbox, weight):
 
 	# ToDo - Merge generate_target and generate_target_others. One is for synth-text and the other is for icdar 2013
 
-	channel, height, width = image_size
+	if len(image_size) == 2:
+		height, width = image_size
+	else:
+		channel, height, width = image_size
 
 	target = np.zeros([height, width], dtype=np.uint8)
 	weight_map = np.zeros([height, width], dtype=np.float32)
@@ -334,7 +343,10 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 
 	character_bbox = character_bbox.transpose(2, 1, 0)
 
-	channel, height, width = image_size
+	if len(image_size) == 2:
+		height, width = image_size
+	else:
+		channel, height, width = image_size
 
 	target = np.zeros([height, width], dtype=np.uint8)
 
@@ -368,13 +380,15 @@ def generate_affinity_others(image_size, character_bbox, weight):
 
 	# ToDo - merge the generate_affinity function with generate_affinity_others function
 
-	channel, height, width = image_size
+	if len(image_size) == 2:
+		height, width = image_size
+	else:
+		channel, height, width = image_size
 
 	target = np.zeros([height, width], dtype=np.uint8)
 	weight_map = np.zeros([height, width], dtype=np.float32)
 
 	for i, word in enumerate(character_bbox):
-
 		for char_num in range(len(word)-1):
 			target, weight_map = add_affinity_others(
 				target,
@@ -478,7 +492,7 @@ class DataLoaderEval(data.Dataset):
 	def __init__(self, path):
 
 		self.base_path = path
-		self.imnames = os.listdir(self.base_path)
+		self.imnames = sorted(os.listdir(self.base_path))
 
 	def __getitem__(self, item):
 

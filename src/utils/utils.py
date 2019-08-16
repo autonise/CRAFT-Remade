@@ -429,6 +429,8 @@ def get_smooth_polygon(word_contours):
 
 def join(characters, joints, return_characters=False):
 
+	# ToDo Change this function to be exactly like it is in the CRAFT paper
+
 	"""
 	Function to create word-polygon from character-bbox and affinity-bbox.
 	A graph is created in which all the character-bbox and affinity-bbox are treated as nodes and there is an edge
@@ -450,8 +452,7 @@ def join(characters, joints, return_characters=False):
 
 	for contour_i in range(all_joined.shape[0]-1):
 		for contour_j in range(contour_i+1, all_joined.shape[0]):
-			value = Polygon(all_joined[contour_i]).intersection(Polygon(all_joined[contour_j])).area
-			if value > 0:
+			if Polygon(all_joined[contour_i]).intersection(Polygon(all_joined[contour_j])).area > 0:
 				graph.add_edge(contour_i, contour_j)
 
 	all_words = nx.connected_components(graph)
@@ -459,12 +460,71 @@ def join(characters, joints, return_characters=False):
 	all_character_contours = []
 
 	for word_idx in all_words:
+
 		if len(all_joined[np.array(list(word_idx))[list(np.where(np.array(list(word_idx)) < len(characters)))[0]]]) == 0:
 			continue
 
 		all_word_contours.append(get_smooth_polygon(all_joined[list(word_idx)]))
+
+		edges = np.array(list(graph.subgraph(nx.shortest_path(graph, list(word_idx)[0]).keys()).edges()))
+
+		values, count = np.unique(np.array(edges).ravel(), return_counts=True)
+
+		print(values, count, word_idx, edges)
+
+		if values.shape[0] == 0:
+			all_character_contours.append(
+				all_joined[list(word_idx)[0]])
+			continue
+		else:
+			start = values[np.where(count == 1)[0][0]]
+
+		def check_in(value, array, current_done):
+
+			all_found = []
+
+			for i_, array_i in enumerate(array):
+				for j_, array_j in enumerate(array_i):
+					if value == array_j:
+						if current_done[i_] == 0:
+							all_found.append([i_, array_i[(j_ + 1) % 2]])
+							current_done[i_] = 1
+
+			return all_found, current_done
+
+		def dist_contour(cont1, cont2):
+
+			return np.sqrt(np.sum(np.square(np.mean(cont1, axis=0) - np.mean(cont2, axis=0))))
+
+		sequential_characters_affinity = [start]
+
+		done = np.zeros([edges.shape[0]])
+
+		for _ in range(edges.copy().shape[0] - 1):
+
+			found, done = check_in(sequential_characters_affinity[-1], edges, done)
+			print(found)
+			assert len(found) != 0, 'Some problem in finding connected components'
+
+			min_dist = dist_contour(all_joined[found[0][1]], all_joined[sequential_characters_affinity[-1]])
+			partner = found[0][1]
+
+			for __ in range(1, len(found)):
+
+				cur_dist = dist_contour(all_joined[found[__][1]], all_joined[sequential_characters_affinity[-1]])
+
+				if cur_dist < min_dist:
+					min_dist = cur_dist
+					partner = found[__][1]
+
+				# edges = np.delete(edges, found[__][0], axis=0)
+
+			sequential_characters_affinity.append(partner)
+
 		all_character_contours.append(
-			all_joined[np.array(list(word_idx))[list(np.where(np.array(list(word_idx)) < len(characters)))[0]]])
+			all_joined[
+				np.array(sequential_characters_affinity)[
+					list(np.where(np.array(sequential_characters_affinity) < len(characters)))[0]]])
 
 	if return_characters:
 		return all_word_contours, all_character_contours
