@@ -60,28 +60,28 @@ def resize(image, character, side=768):
 
 	height, width, channel = image.shape
 	max_side = max(height, width)
-	new_resize = (int(width/max_side*side), int(height/max_side*side))
+	new_resize = (int(width / max_side * side), int(height / max_side * side))
 	image = cv2.resize(image, new_resize)
+	if len(character.shape) == 3:
+		character = character.transpose(2,1,0)
+		character = np.array([character])
 
-	character[0, :, :] = character[0, :, :]/width*new_resize[0]
-	character[1, :, :] = character[1, :, :]/height*new_resize[1]
+	for i in range(len(character)):
+		character[i][:, :, 0] = character[i][:, :, 0] / width * new_resize[0]
+		character[i][:, :, 1] = character[i][:, :, 1] / height * new_resize[1]
 
-	# character[:, :,0] = character[:, :,0] / width * new_resize[0]
-	# character[:, :,1] = character[:, :,1] / height * new_resize[1]
-
-	big_image = np.ones([side, side, 3], dtype=np.float32)*np.mean(image)
+	big_image = np.ones([side, side, 3], dtype=np.float32) * np.mean(image)
 	big_image[
-		(side-image.shape[0])//2: (side-image.shape[0])//2 + image.shape[0],
-		(side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
+	(side - image.shape[0]) // 2: (side - image.shape[0]) // 2 + image.shape[0],
+	(side - image.shape[1]) // 2: (side - image.shape[1]) // 2 + image.shape[1]] = image
 	big_image = big_image.astype(np.uint8)
 
-	character[0, :, :] += (side-image.shape[1])//2
-	character[1, :, :] += (side-image.shape[0])//2
+	for i in range(len(character)):
+		character[i][:, :, 0] += (side - image.shape[1]) // 2
+		character[i][:, :, 1] += (side - image.shape[0]) // 2
 
-	# character[:, :,0] += (side-image.shape[0])//2
-	# character[:, :,1] += (side-image.shape[1])//2
+	return big_image, character.squeeze()
 
-	return big_image, character
 
 
 def resize_generated(image, character, side=768):
@@ -285,14 +285,29 @@ def generate_target(image_size, character_bbox, weight=None):
 
 	target = np.zeros([height, width], dtype=np.uint8)
 
-	for i in range(character_bbox.shape[0]):
+	if len(character_bbox) == 3:
 
-		target = add_character(target, character_bbox[i].copy())
+		for i in range(character_bbox.shape[0]):
 
-	if weight is not None:
-		return target/255, np.float32(target != 0)
-	else:
-		return target/255
+			target = add_character(target, character_bbox[i].copy())
+
+		if weight is not None:
+			return target/255, np.float32(target != 0)
+		else:
+			return target/255
+
+	else :
+		weight_map = np.zeros([height, width], dtype=np.float32)
+
+		for word_no in range(len(character_bbox)):
+
+			for i in range(character_bbox[word_no].shape[0]):
+				target, weight_map = add_character_others(target, weight_map, weight[word_no],
+				                                          character_bbox[word_no][i].copy())
+
+		return target / 255, weight_map
+
+
 
 
 def generate_target_others(image_size, character_bbox, weight):
@@ -482,7 +497,7 @@ class DataLoaderSYNTH(data.Dataset):
 		image = plt.imread(self.base_path+'/'+self.imnames[item][0])  # Read the image
 		image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
 		image = image.transpose(2, 0, 1)/255
-		character = character.transpose(2,1,0)
+
 		weight = generate_target(image.shape, character.copy())  # Generate character heatmap
 		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())  # Generate affinity heatmap
 
