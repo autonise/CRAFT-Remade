@@ -21,7 +21,7 @@ DataLoaderICDAR2013_Synthesis = '/home/SharedData/Mayank/ICDAR2013/Save/s'
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
 
 batch_size = {
-	'train': 2,
+	'train': 3,
 	'test': 3,
 }
 

@@ -104,13 +104,14 @@ class DataLoaderMIX(data.Dataset):
 		else:
 
 			image = plt.imread(self.base_path_other_images+'/'+self.gt[item % len(self.gt)][0])  # Read the image
-			character = [np.array(char_i) for char_i in self.gt[item % len(self.gt)][1]['characters']]
-			affinity = [np.array(char_i) for char_i in self.gt[item % len(self.gt)][1]['affinity']]
+			character = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['characters']]
+			affinity = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['affinity']]
+
+			assert len(character) == len(affinity), 'word length different in character and affinity'
 
 			# Resize the image to (768, 768)
-			image, character_affinity = resize_generated(image, character.copy()+affinity.copy())
-			character = character_affinity[0:len(self.gt[item % len(self.gt)][1]['characters'])]
-			affinity = character_affinity[len(self.gt[item % len(self.gt)][1]['characters']):]
+			image, character, affinity = resize_generated(image, character.copy(), affinity.copy())
+
 			image = image.transpose(2, 0, 1) / 255
 			weights = [i for i in self.gt[item % len(self.gt)][1]['weights']]
 

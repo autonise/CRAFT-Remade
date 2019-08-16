@@ -9,7 +9,6 @@
       <change beforePath="$PROJECT_DIR$/train_synth/synthesize.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/synthesize.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/train_weak_supervision/trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/trainer.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -30,6 +29,7 @@
   <component name="ProjectId" id="1Opid764MiXin0CPLnJ8FgFEgVt" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="settings.editor.selected.configurable" value="editor.preferences.tabs" />
   </component>

@@ -98,13 +98,13 @@ def resize(image, character, side=768):
 	return big_image, character
 
 
-def resize_generated(image, character, side=768):
+def resize_generated(image, character, affinity, side=768):
 	"""
 		Resizing the image while maintaining the aspect ratio and padding with average of the entire image to make the
 		reshaped size = (side, side)
 		:param image: np.array, dtype=np.uint8, shape=[height, width, 3]
-		ToDo - Find the exact dimensions of the character bbox and merge resize and resize_generated functions
-		:param character: np.array, dtype=np.int32 or np.float32, shape = [something, something, 2]
+		:param character: list of np.array, dtype=np.int64, shape = [num_words, num_characters, 4, 1, 2]
+		:param affinity: list of np.array, dtype=np.int64, shape = [num_words, num_affinity, 4, 1, 2]
 		:param side: new size to be reshaped to
 		:return: resized_image, corresponding reshaped character bbox
 	"""
@@ -114,10 +114,12 @@ def resize_generated(image, character, side=768):
 	new_resize = (int(width/max_side*side), int(height/max_side*side))
 	image = cv2.resize(image, new_resize)
 
-	for i in range(len(character)):
+	for word_no in range(len(character)):
 
-		character[i][:, :, 0] = character[i][:, :, 0]/width*new_resize[0]
-		character[i][:, :, 1] = character[i][:, :, 1]/height*new_resize[1]
+		character[word_no][:, :, :, 0] = character[word_no][:, :, :, 0] / width * new_resize[0]
+		character[word_no][:, :, :, 1] = character[word_no][:, :, :, 1] / height * new_resize[1]
+		affinity[word_no][:, :, :, 0] = affinity[word_no][:, :, :, 0] / width * new_resize[0]
+		affinity[word_no][:, :, :, 1] = affinity[word_no][:, :, :, 1] / height * new_resize[1]
 
 	big_image = np.ones([side, side, 3], dtype=np.float32)*np.mean(image)
 	big_image[
@@ -125,11 +127,14 @@ def resize_generated(image, character, side=768):
 		(side-image.shape[1])//2: (side-image.shape[1])//2 + image.shape[1]] = image
 	big_image = big_image.astype(np.uint8)
 
-	for i in range(len(character)):
-		character[i][:, :, 0] += (side-image.shape[1])//2
-		character[i][:, :, 1] += (side-image.shape[0])//2
+	for word_no in range(len(character)):
 
-	return big_image, character
+		character[word_no][:, :, :, 0] += (side - image.shape[1]) // 2
+		character[word_no][:, :, :, 1] += (side - image.shape[0]) // 2
+		affinity[word_no][:, :, :, 0] += (side - image.shape[1]) // 2
+		affinity[word_no][:, :, :, 1] += (side - image.shape[0]) // 2
+
+	return big_image, character, affinity
 
 
 def add_character(image, bbox):
@@ -252,13 +257,23 @@ def add_affinity(image, bbox_1, bbox_2):
 
 def two_char_bbox_to_affinity(bbox_1, bbox_2):
 
+	"""
+	Given two character bbox generates the co-ordinates of the affinity bbox between them
+	:param bbox_1: type=np.array, dtype=np.int64, shape = [4, 1, 2]
+	:param bbox_2: type=np.array, dtype=np.int64, shape = [4, 1, 2]
+	:return: affinity bbox, type=np.array, dtype=np.int64, shape = [4, 1, 2]
+	"""
+
+	bbox_1 = bbox_1[:, 0, :].copy()
+	bbox_2 = bbox_2[:, 0, :].copy()
+
 	center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
 	tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
 	bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
 	tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
 	br = np.mean([bbox_2[2], bbox_2[3], center_2], axis=0)
 
-	affinity = np.array([tl, tr, br, bl])
+	affinity = np.array([tl, tr, br, bl]).reshape([4, 1, 2])
 
 	return affinity
 
@@ -346,7 +361,7 @@ def generate_target_others(image_size, character_bbox, weight):
 
 		for i in range(character_bbox[word_no].shape[0]):
 
-			target, weight_map = add_character_others(target, weight_map, weight[word_no], character_bbox[word_no][i].copy())
+			target, weight_map = add_character_others(target, weight_map, weight[word_no], character_bbox[word_no][i].copy()[:, 0, :])
 
 	return target/255, weight_map
 
@@ -420,8 +435,8 @@ def generate_affinity_others(image_size, character_bbox, weight):
 				target,
 				weight_map,
 				weight[i],
-				word[char_num].copy(),
-				word[char_num+1].copy())
+				word[char_num][:, 0, :].copy(),
+				word[char_num+1][:, 0, :].copy())
 
 	return target/255, weight_map
 
