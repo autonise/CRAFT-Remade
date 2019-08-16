@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
-import train_synth.config as config
+import config as config
 
 """
 	globally generating gaussian heatmap which will be warped for every character bbox
@@ -66,6 +66,9 @@ def resize(image, character, side=768):
 	character[0, :, :] = character[0, :, :]/width*new_resize[0]
 	character[1, :, :] = character[1, :, :]/height*new_resize[1]
 
+	# character[:, :,0] = character[:, :,0] / width * new_resize[0]
+	# character[:, :,1] = character[:, :,1] / height * new_resize[1]
+
 	big_image = np.ones([side, side, 3], dtype=np.float32)*np.mean(image)
 	big_image[
 		(side-image.shape[0])//2: (side-image.shape[0])//2 + image.shape[0],
@@ -74,6 +77,9 @@ def resize(image, character, side=768):
 
 	character[0, :, :] += (side-image.shape[1])//2
 	character[1, :, :] += (side-image.shape[0])//2
+
+	# character[:, :,0] += (side-image.shape[0])//2
+	# character[:, :,1] += (side-image.shape[1])//2
 
 	return big_image, character
 
@@ -273,7 +279,7 @@ def generate_target(image_size, character_bbox, weight=None):
 
 	# ToDo - Merge generate_target and generate_target_others. One is for synth-text and the other is for icdar 2013
 
-	character_bbox = character_bbox.transpose(2, 1, 0)
+	# character_bbox = character_bbox.transpose(2, 1, 0)
 
 	channel, height, width = image_size
 
@@ -316,12 +322,12 @@ def generate_target_others(image_size, character_bbox, weight):
 	return target/255, weight_map
 
 
-def generate_affinity(image_size, character_bbox, text, weight=None):
+def generate_affinity(image_size, character_bbox, text=None, weight=None):
 
 	"""
 
 	:param image_size: shape = [3, image_height, image_width]
-	:param character_bbox: [2, 4, num_characters]
+	:param character_bbox: [num_characters, 4, 2]
 	:param text: [num_words]
 	:param weight: This is currently used only for synth-text so specifying weight as not None will generate a heatmap
 					having value one where there is affinity
@@ -332,19 +338,36 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 
 	# ToDo - merge the generate_affinity function with generate_affinity_others function
 
-	character_bbox = character_bbox.transpose(2, 1, 0)
+	# character_bbox = character_bbox.transpose(2, 1, 0)
 
 	channel, height, width = image_size
 
 	target = np.zeros([height, width], dtype=np.uint8)
 
-	total_letters = 0
+	if text is not None:
 
-	for word in text:
-		for char_num in range(len(word)-1):
-			target = add_affinity(target, character_bbox[total_letters].copy(), character_bbox[total_letters+1].copy())
+		total_letters = 0
+
+		for word in text:
+			for char_num in range(len(word)-1):
+				target = add_affinity(target, character_bbox[total_letters].copy(), character_bbox[total_letters+1].copy())
+				total_letters += 1
 			total_letters += 1
-		total_letters += 1
+
+	else :
+		weight_map = np.zeros([height, width], dtype=np.float32)
+
+		for i, word in enumerate(character_bbox):
+
+			for char_num in range(len(word) - 1):
+				target, weight_map = add_affinity_others(
+					target,
+					weight_map,
+					weight[i],
+					word[char_num].copy(),
+					word[char_num + 1].copy())
+
+		return target / 255, weight_map
 
 	if weight is not None:
 
@@ -392,7 +415,7 @@ class DataLoaderSYNTH(data.Dataset):
 		DataLoader for strong supervised training on Synth-Text
 	"""
 
-	DEBUG = False  # Make this True if you want to do a run on small set of Synth-Text
+	DEBUG = True  # Make this True if you want to do a run on small set of Synth-Text
 
 	def __init__(self, type_):
 
@@ -437,7 +460,7 @@ class DataLoaderSYNTH(data.Dataset):
 			if self.type_ == 'train':
 
 				self.imnames = mat['imnames'][0][0:train_images]
-				self.charBB = mat['charBB'][0][0:train_images]  # number of images, 2, 4, num_character
+				self.charBB = mat['charBB'][0][0:train_images] # number of images, 2, 4, num_character
 				self.txt = mat['txt'][0][0:train_images]
 
 			else:
@@ -454,11 +477,12 @@ class DataLoaderSYNTH(data.Dataset):
 
 			self.txt[no] = all_words
 
-	def __getitem__(self, item):
+	def getitem(self, item):
 
 		image = plt.imread(self.base_path+'/'+self.imnames[item][0])  # Read the image
 		image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
 		image = image.transpose(2, 0, 1)/255
+		character = character.transpose(2,1,0)
 		weight = generate_target(image.shape, character.copy())  # Generate character heatmap
 		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())  # Generate affinity heatmap
 
@@ -482,6 +506,8 @@ class DataLoaderEval(data.Dataset):
 
 	def __getitem__(self, item):
 
+
+
 		image = plt.imread(self.base_path+'/'+self.imnames[item])  # Read the image
 
 		# ------ Resize the image to (768, 768) ---------- #
@@ -502,3 +528,9 @@ class DataLoaderEval(data.Dataset):
 	def __len__(self):
 
 		return len(self.imnames)
+
+
+
+
+dataloader = DataLoaderSYNTH('train')
+print(dataloader.getitem(2))

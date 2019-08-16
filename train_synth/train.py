@@ -70,7 +70,7 @@ def save(data, output, target, target_affinity, epoch, no):
 def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_loss, all_accuracy):
 
 	"""
-	Function to test
+	Function to train
 	:param dataloader: Pytorch dataloader
 	:param loss_criterian: Loss function with OHNM using MSE Loss
 	:param model: Pytorch model of UNet-ResNet

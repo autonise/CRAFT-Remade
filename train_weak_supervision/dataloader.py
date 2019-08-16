@@ -5,12 +5,12 @@ import cv2
 import os
 import json
 
-import train_weak_supervision.config as config
+import config as config
 from train_synth.dataloader import resize, resize_generated
 from train_synth.dataloader import generate_affinity, generate_target, generate_target_others, generate_affinity_others
 
 
-DEBUG = False
+DEBUG = True
 
 
 class DataLoaderMIX(data.Dataset):
@@ -168,3 +168,6 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 	def __len__(self):
 
 		return len(self.imnames)
+
+dataloader = DataLoaderEvalICDAR2013('train')
+print(dataloader.getitem(2))
