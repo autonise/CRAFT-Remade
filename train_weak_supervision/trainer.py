@@ -75,7 +75,7 @@ def train(model, optimizer, iteration):
 	:return: model, optimizer
 	"""
 
-	dataloader = DataLoader(DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=0)
+	dataloader = DataLoader(DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=0, shuffle=True)
 	loss_criterian = DataParallelCriterion(Criterian())
 
 	model.train()

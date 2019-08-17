@@ -10,7 +10,7 @@ from train_synth.dataloader import resize, resize_generated
 from train_synth.dataloader import generate_affinity, generate_target, generate_target_others
 
 
-DEBUG = False
+DEBUG = True
 
 
 class DataLoaderMIX(data.Dataset):

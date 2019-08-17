@@ -109,8 +109,8 @@ def weak_supervision(model, iterations):
 
 	for iteration in range(int(iterations)):
 
-		print('Generating for iteration:', iteration)
-		generate_target(model, iteration)
+		# print('Generating for iteration:', iteration)
+		# generate_target(model, iteration)
 
 		# ToDo - Check the effects of using a new optimizer after every iteration or using the previous iteration optimizer
 
