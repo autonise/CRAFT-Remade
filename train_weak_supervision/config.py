@@ -10,7 +10,7 @@ save_path = '/home/SharedData/Mayank/Models/WeakSupervision/ICDAR2013'
 images_path = '/home/SharedData/Mayank/ICDAR2013/Images'
 target_path = '/home/SharedData/Mayank/ICDAR2013/Generated'
 
-prob_synth = 0.2
+prob_synth = 0.8
 
 DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
 DataLoaderSYNTH_mat = '/home/SharedData/Mayank/SynthText/gt.mat'
@@ -21,8 +21,8 @@ DataLoaderICDAR2013_Synthesis = '/home/SharedData/Mayank/ICDAR2013/Save/s'
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
 
 batch_size = {
-	'train': 2,
-	'test': 2,
+	'train': 3,
+	'test': 3,
 }
 
 lr = {

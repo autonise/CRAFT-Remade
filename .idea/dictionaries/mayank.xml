@@ -4,6 +4,7 @@
       <w>annot</w>
       <w>annots</w>
       <w>bilinear</w>
+      <w>cmap</w>
       <w>conv</w>
       <w>criterian</w>
       <w>cuda</w>
@@ -15,6 +16,7 @@
       <w>heatmap</w>
       <w>icdar</w>
       <w>imnames</w>
+      <w>imsave</w>
       <w>matlab</w>
       <w>matplotlib</w>
       <w>mayank</w>

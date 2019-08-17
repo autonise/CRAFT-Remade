@@ -8,8 +8,8 @@ save_path = '/home/prantik/Documents/Datasets/Text-Detection/SynthText'
 use_cuda = False
 
 batch_size = {
-	'train': 3,
-	'test': 1,
+	'train': 2,
+	'test': 3,
 }
 
 pretrained = False
@@ -36,4 +36,8 @@ DataLoaderSYNTH_base_path = '/home/prantik/Documents/Datasets/Text-Detection/Syn
 DataLoaderSYNTH_mat = '/home/prantik/Documents/Datasets/Text-Detection/SynthText/gt.mat'
 DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'
 
+
 ICDAR2013_path = '/home/prantik/Documents/Datasets/Text-Detection/ICDAR2013'
+
+visualize_generated = False
+
