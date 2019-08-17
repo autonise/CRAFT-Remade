@@ -16,9 +16,12 @@
 =======
       <change beforePath="$PROJECT_DIR$/train_synth/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/config.py" afterDir="false" />
+<<<<<<< Updated upstream
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/trainer.py" afterDir="false" />
 >>>>>>> d631015c35f56c374979b69a824df95077341498
+=======
+>>>>>>> Stashed changes
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />

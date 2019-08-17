@@ -4,7 +4,9 @@ Config containing all hardcoded parameters for training strong supervised model 
 
 num_cuda = "0"
 seed = 0
+
 save_path = '/home/prantik/Documents/Datasets/Text-Detection/SynthText'
+
 use_cuda = False
 
 batch_size = {
@@ -34,7 +36,8 @@ threshold_fscore = 0.5
 
 DataLoaderSYNTH_base_path = '/home/prantik/Documents/Datasets/Text-Detection/SynthText/Images'
 DataLoaderSYNTH_mat = '/home/prantik/Documents/Datasets/Text-Detection/SynthText/gt.mat'
-DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'
+
+DataLoaderSYNTH_Train_Synthesis = '/home/prantik/Documents/Datasets/Text-Detection/SynthText/train_synthesis/'
 
 
 ICDAR2013_path = '/home/prantik/Documents/Datasets/Text-Detection/ICDAR2013'

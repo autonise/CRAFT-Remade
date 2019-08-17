@@ -5,20 +5,20 @@ Config containing all hardcoded parameters for training weak supervised model on
 use_cuda = True
 num_cuda = "0"
 
-save_path = '/home/SharedData/Mayank/Models/WeakSupervision/ICDAR2013'
+save_path = '/home/prantik/Documents/Datasets/Text-Detection/Models/WeakSupervision/ICDAR2013'
 
-images_path = '/home/SharedData/Mayank/ICDAR2013/Images'
-target_path = '/home/SharedData/Mayank/ICDAR2013/Generated'
+images_path = '/home/prantik/Documents/Datasets/Text-Detection/ICDAR2013/Images'
+target_path = '/home/prantik/Documents/Datasets/Text-Detection/ICDAR2013/Generated'
 
 prob_synth = 0.8
 
-DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
-DataLoaderSYNTH_mat = '/home/SharedData/Mayank/SynthText/gt.mat'
-DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'
+DataLoaderSYNTH_base_path = '/home/prantik/Documents/Datasets/Text-Detection/SynthText/Images'
+DataLoaderSYNTH_mat = '/home/prantik/Documents/Datasets/Text-Detection/SynthText/gt.mat'
+DataLoaderSYNTH_Train_Synthesis = '/home/prantik/Documents/Datasets/Text-Detection/SynthText/train_synthesis/'
 
-DataLoaderICDAR2013_Synthesis = '/home/SharedData/Mayank/ICDAR2013/Save/s'
+DataLoaderICDAR2013_Synthesis = '/home/prantik/Documents/Datasets/Text-Detection/ICDAR2013/Save/s'
 
-ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
+ICDAR2013_path = '/home/prantik/Documents/Datasets/Text-Detection/ICDAR2013'
 
 batch_size = {
 	'train': 3,
