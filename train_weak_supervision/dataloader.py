@@ -10,7 +10,7 @@ from train_synth.dataloader import resize, resize_generated
 from train_synth.dataloader import generate_affinity, generate_target, generate_target_others, generate_affinity_others
 
 
-DEBUG = True
+DEBUG = False
 
 
 class DataLoaderMIX(data.Dataset):
@@ -89,6 +89,7 @@ class DataLoaderMIX(data.Dataset):
 		if np.random.uniform() < config.prob_synth:  # probability of picking a Synth-Text image vs Image from dataset
 
 			image = plt.imread(self.base_path_synth+'/'+self.imnames[item][0])  # Read the image
+			height, width, channel = image.shape
 			image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
 			image = image.transpose(2, 0, 1)/255
 
@@ -101,11 +102,14 @@ class DataLoaderMIX(data.Dataset):
 				self.txt[item].copy(),
 				weight=1)
 
+			word_bbox = np.array([item, -1])
+
 		else:
 
 			image = plt.imread(self.base_path_other_images+'/'+self.gt[item % len(self.gt)][0])  # Read the image
-			character = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['characters']]
-			affinity = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['affinity']]
+			height, width, channel = image.shape
+			character = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['characters'].copy()]
+			affinity = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['affinity'].copy()]
 
 			assert len(character) == len(affinity), 'word length different in character and affinity'
 
@@ -113,7 +117,7 @@ class DataLoaderMIX(data.Dataset):
 			image, character, affinity = resize_generated(image, character.copy(), affinity.copy())
 
 			image = image.transpose(2, 0, 1) / 255
-			weights = [i for i in self.gt[item % len(self.gt)][1]['weights']]
+			weights = [i for i in self.gt[item % len(self.gt)][1]['weights'].copy()]
 
 			# Generate character heatmap with weights
 			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights.copy())
@@ -121,12 +125,17 @@ class DataLoaderMIX(data.Dataset):
 			# Generate affinity heatmap with weights
 			weight_affinity, weak_supervision_affinity = generate_target_others(image.shape, affinity.copy(), weights.copy())
 
+			# Get original word_bbox annotations
+			word_bbox = np.array([item, 1])
+
 		return \
 			image.astype(np.float32), \
 			weight_character.astype(np.float32), \
 			weight_affinity.astype(np.float32), \
 			weak_supervision_char.astype(np.float32), \
-			weak_supervision_affinity.astype(np.float32)
+			weak_supervision_affinity.astype(np.float32), \
+			word_bbox, \
+			np.array([height, width])
 
 	def __len__(self):
 
