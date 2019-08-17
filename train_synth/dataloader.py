@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
-import train_synth.config as config
+import config as config
 
 """
 	globally generating gaussian heatmap which will be warped for every character bbox
@@ -332,7 +332,7 @@ def generate_target(image_size, character_bbox, weight=None):
 
 	target = np.zeros([height, width], dtype=np.uint8)
 
-	if len(character_bbox) == 3:
+	if len(character_bbox.shape) == 3:
 
 		for i in range(character_bbox.shape[0]):
 
@@ -552,7 +552,6 @@ class DataLoaderSYNTH(data.Dataset):
 		image = plt.imread(self.base_path+'/'+self.imnames[item][0])  # Read the image
 		image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
 		image = image.transpose(2, 0, 1)/255
-
 		weight = generate_target(image.shape, character.copy())  # Generate character heatmap
 		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())  # Generate affinity heatmap
 
