@@ -5,7 +5,7 @@ import cv2
 import os
 import json
 
-import config as config
+import train_synth.config as config
 from train_synth.dataloader import resize, resize_generated
 from train_synth.dataloader import generate_affinity, generate_target, generate_target_others, generate_affinity_others
 

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
-import config as config
+import train_synth.config as config
 
 """
 	globally generating gaussian heatmap which will be warped for every character bbox
