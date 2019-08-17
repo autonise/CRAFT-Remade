@@ -112,7 +112,7 @@ def train(model, optimizer, iteration):
 			character_weight, affinity_weight = character_weight.cuda(), affinity_weight.cuda()
 
 		output = model(image)
-		loss = loss_criterian(output, character_map, affinity_map, character_weight, affinity_weight).mean()
+		loss = loss_criterian(output, character_map, affinity_map).mean()
 
 		all_loss.append(loss.item())
 
@@ -138,6 +138,14 @@ def train(model, optimizer, iteration):
 		for __, _ in enumerate(word_bbox):
 
 			if _[1] == 1:
+
+				# os.makedirs('Check/'+str(no), exist_ok=True)
+				#
+				# plt.imsave('Check/'+str(no)+'/image_'+str(__)+'.png', image[__].data.cpu().numpy().transpose(1, 2, 0))
+				# plt.imsave('Check/'+str(no)+'/character_map_'+str(__)+'.png', image[__].data.cpu().numpy().transpose(1, 2, 0)*character_map[__].data.cpu().numpy()[:, :, None])
+				# plt.imsave('Check/'+str(no)+'/affinity_map_'+str(__)+'.png', image[__].data.cpu().numpy().transpose(1, 2, 0)*affinity_map[__].data.cpu().numpy()[:, :, None])
+				# plt.imsave('Check/'+str(no)+'/character_weight_'+str(__)+'.png', character_map[__].data.cpu().numpy()*character_weight[__].data.cpu().numpy(), cmap='gray')
+				# plt.imsave('Check/'+str(no)+'/affinity_weight_'+str(__)+'.png', affinity_map[__].data.cpu().numpy()*affinity_weight[__].data.cpu().numpy(), cmap='gray')
 
 				# ToDo - Understand why model.train() gives poor results but model.eval() with torch.no_grad() gives better results
 
@@ -204,7 +212,6 @@ def train(model, optimizer, iteration):
 			'] Average Loss:' + str(
 				int(np.array(all_loss)[-min(1000, len(all_loss)):].mean() * 100000000) / 100000000) +
 			'| Average F-Score: ' + str(f_score)
-
 		)
 
 	torch.cuda.empty_cache()

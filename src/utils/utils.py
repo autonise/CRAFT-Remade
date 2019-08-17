@@ -505,7 +505,7 @@ def join(characters, joints, return_characters=False):
 		else:
 			all_affinity_contours.append(np.zeros([0, 4, 1, 2]))
 
-	all_word_contours = np.array(all_word_contours, dtype=np.int64)
+	all_word_contours = np.array(all_word_contours, dtype=np.int64).reshape([len(all_word_contours), 4, 1, 2])
 
 	if return_characters:
 		return all_word_contours, all_character_contours, all_affinity_contours

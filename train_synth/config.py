@@ -8,7 +8,7 @@ save_path = '/home/SharedData/Mayank/Models/SYNTH'
 use_cuda = False
 
 batch_size = {
-	'train': 2,
+	'train': 3,
 	'test': 3,
 }
 
@@ -38,4 +38,4 @@ DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_sy
 
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
 
-visualize_generated = False
+visualize_generated = True
