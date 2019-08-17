@@ -38,4 +38,4 @@ DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_sy
 
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
 
-visualize_generated = True
+visualize_generated = False

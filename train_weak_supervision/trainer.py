@@ -112,13 +112,15 @@ def train(model, optimizer, iteration):
 			character_weight, affinity_weight = character_weight.cuda(), affinity_weight.cuda()
 
 		output = model(image)
-		loss = loss_criterian(output, character_map, affinity_map).mean()
+		loss = loss_criterian(output, character_map, affinity_map, character_weight, affinity_weight).mean()/4
 
-		all_loss.append(loss.item())
+		all_loss.append(loss.item()*4)
 
 		loss.backward()
-		optimizer.step()
-		optimizer.zero_grad()
+
+		if (no + 1) % 4 == 0:
+			optimizer.step()
+			optimizer.zero_grad()
 
 		# ---------- Calculating the F-score ------------ #
 
@@ -207,12 +209,17 @@ def train(model, optimizer, iteration):
 			f_score = 0
 
 		iterator.set_description(
-			'Loss:' + str(int(loss.item() * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
+			'Loss:' + str(int(loss.item() * 4 * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
 				len(iterator)) +
 			'] Average Loss:' + str(
 				int(np.array(all_loss)[-min(1000, len(all_loss)):].mean() * 100000000) / 100000000) +
 			'| Average F-Score: ' + str(f_score)
 		)
+
+	if len(iterator) % 4 != 0:
+
+		optimizer.step()
+		optimizer.zero_grad()
 
 	torch.cuda.empty_cache()
 

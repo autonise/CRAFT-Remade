@@ -1,5 +1,19 @@
 import click
 import os
+import torch
+import numpy as np
+import random
+
+
+def seed(config):
+
+	# This removes randomness, makes everything deterministic
+
+	np.random.seed(config.seed)
+	random.seed(config.seed)
+	torch.manual_seed(config.seed)
+	torch.cuda.manual_seed(config.seed)
+	torch.backends.cudnn.deterministic = True
 
 
 @click.group()
@@ -77,6 +91,11 @@ def weak_supervision(model, iterations):
 	"""
 
 	from train_weak_supervision.__init__ import get_initial_model_optimizer, generate_target, train, save_model
+	from train_weak_supervision import config
+
+	seed(config)
+
+	# ToDo - Check the effects of using optimizer of Synth-Text or starting from a random optimizer
 
 	model, optimizer = get_initial_model_optimizer(model)
 
@@ -92,6 +111,8 @@ def weak_supervision(model, iterations):
 
 		print('Generating for iteration:', iteration)
 		generate_target(model, iteration)
+
+		# ToDo - Check the effects of using a new optimizer after every iteration or using the previous iteration optimizer
 
 		print('Fine-tuning for iteration:', iteration)
 		model, optimizer = train(model, optimizer, iteration)

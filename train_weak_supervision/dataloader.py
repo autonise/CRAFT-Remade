@@ -7,10 +7,10 @@ import json
 
 import train_weak_supervision.config as config
 from train_synth.dataloader import resize, resize_generated
-from train_synth.dataloader import generate_affinity, generate_target, generate_target_others, generate_affinity_others
+from train_synth.dataloader import generate_affinity, generate_target, generate_target_others
 
 
-DEBUG = True
+DEBUG = False
 
 
 class DataLoaderMIX(data.Dataset):
@@ -108,8 +108,10 @@ class DataLoaderMIX(data.Dataset):
 
 			image = plt.imread(self.base_path_other_images+'/'+self.gt[item % len(self.gt)][0])  # Read the image
 			height, width, channel = image.shape
-			character = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['characters'].copy()]
-			affinity = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['affinity'].copy()]
+			character = [
+				np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['characters'].copy()]
+			affinity = [
+				np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['affinity'].copy()]
 
 			assert len(character) == len(affinity), 'word length different in character and affinity'
 
