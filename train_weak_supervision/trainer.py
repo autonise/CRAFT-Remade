@@ -1,8 +1,8 @@
-from train_weak_supervision.dataloader import DataLoaderMIX
+from train_weak_supervision.dataloader import DataLoaderMIX, DataLoaderEvalICDAR2013
 import train_weak_supervision.config as config
 from src.model import Criterian
 from src.utils.parallel import DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, generate_word_bbox
+from src.utils.utils import calculate_batch_fscore, generate_word_bbox, calculate_fscore
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -75,28 +75,23 @@ def train(model, optimizer, iteration):
 	:return: model, optimizer
 	"""
 
-	dataloader = DataLoader(DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=0, shuffle=True)
+	dataloader = DataLoader(
+		DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=8, shuffle=True)
 	loss_criterian = DataParallelCriterion(Criterian())
 
 	model.train()
 	optimizer.zero_grad()
 	iterator = tqdm(dataloader)
 
-	"""
-	Currently not changing the learning rate while weak supervision
-	
-	def change_lr(no):
+	def change_lr(no_i):
 
 		# Change learning rate while training
 
 		for i in config.lr:
-			if i == no:
+			if i == no_i:
 				print('Learning Rate Changed to ', config.lr[i])
 				for param_group in optimizer.param_groups:
 					param_group['lr'] = config.lr[i]
-
-	change_lr(1)
-	"""
 
 	all_loss = []
 	all_accuracy = []
@@ -106,6 +101,8 @@ def train(model, optimizer, iteration):
 
 	for no, (image, character_map, affinity_map, character_weight, affinity_weight, word_bbox, original_dim) in \
 		enumerate(iterator):
+
+		change_lr(no)
 
 		if config.use_cuda:
 			image, character_map, affinity_map = image.cuda(), character_map.cuda(), affinity_map.cuda()
@@ -224,3 +221,81 @@ def train(model, optimizer, iteration):
 	torch.cuda.empty_cache()
 
 	return model, optimizer
+
+
+def test(model):
+
+	"""
+	Test the weak-supervised model
+	:param model: Pre-trained model on SynthText
+	:return: F-score, loss
+	"""
+
+	dataloader = DataLoader(
+		DataLoaderEvalICDAR2013('test'), batch_size=config.batch_size['train'], num_workers=8, shuffle=False)
+
+	with torch.no_grad():
+		model.eval()
+		iterator = tqdm(dataloader)
+		all_accuracy = []
+
+		ground_truth = dataloader.dataset.gt
+
+		for no, (image, image_name, original_dim, item) in enumerate(iterator):
+
+			annots = []
+
+			for i in item:
+				annot = ground_truth['annots'][dataloader.dataset.imnames[i]]
+				annots.append(annot)
+
+			if config.use_cuda:
+				image = image.cuda()
+
+			output = model(image)
+
+			if type(output) == list:
+				output = torch.cat(output, dim=0)
+
+			output = output.data.cpu().numpy()
+			original_dim = original_dim.cpu().numpy()
+
+			f_score = []
+
+			for i in range(output.shape[0]):
+				# --------- Resizing it back to the original image size and saving it ----------- #
+
+				max_dim = original_dim[i].max()
+				resizing_factor = 768 / max_dim
+				before_pad_dim = [int(original_dim[i][0] * resizing_factor), int(original_dim[i][1] * resizing_factor)]
+
+				output[i, :, :, :] = np.uint8(output[i, :, :, :] * 255)
+
+				height_pad = (768 - before_pad_dim[0]) // 2
+				width_pad = (768 - before_pad_dim[1]) // 2
+
+				character_bbox = cv2.resize(
+					output[i, 0, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0])) / 255
+
+				affinity_bbox = cv2.resize(
+					output[i, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0])) / 255
+
+				generated_targets = generate_word_bbox(
+					character_bbox, affinity_bbox,
+					character_threshold=config.threshold_character,
+					affinity_threshold=config.threshold_affinity)
+
+				predicted_word_bbox = generated_targets['word_bbox'].copy()
+
+				f_score.append(calculate_fscore(predicted_word_bbox[:, :, 0, :], np.array(annots[i]['bbox'])))
+				# --------------- PostProcessing for creating the targets for the next iteration ---------------- #
+
+			all_accuracy.append(np.mean(f_score))
+
+			iterator.set_description('F-score: ' + str(np.mean(all_accuracy)))
+
+		torch.cuda.empty_cache()
+
+	return np.mean(all_accuracy)

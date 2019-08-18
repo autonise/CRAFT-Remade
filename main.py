@@ -90,7 +90,7 @@ def weak_supervision(model, iterations):
 	:return: None
 	"""
 
-	from train_weak_supervision.__init__ import get_initial_model_optimizer, generate_target, train, save_model
+	from train_weak_supervision.__init__ import get_initial_model_optimizer, generate_target, train, save_model, test
 	from train_weak_supervision import config
 
 	seed(config)
@@ -109,10 +109,14 @@ def weak_supervision(model, iterations):
 
 	for iteration in range(int(iterations)):
 
-		# print('Generating for iteration:', iteration)
-		# generate_target(model, iteration)
+		print('Generating for iteration:', iteration)
+		generate_target(model, iteration)
 
 		# ToDo - Check the effects of using a new optimizer after every iteration or using the previous iteration optimizer
+
+		print('Testing for iteration:', iteration)
+		f_score_test = test(model)
+		print('Test Results for iteration:', iteration, ' | F-score: ', f_score_test)
 
 		print('Fine-tuning for iteration:', iteration)
 		model, optimizer = train(model, optimizer, iteration)

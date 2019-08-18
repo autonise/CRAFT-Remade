@@ -179,11 +179,13 @@ def synthesize_with_score(dataloader, model, base_target_path):
 					output[i, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
 					(original_dim[i][1], original_dim[i][0]))/255
 
-				image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
-				image_i = cv2.resize(
-					image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-					(original_dim[i][1], original_dim[i][0])
-				)
+				if config.visualize_generated:
+
+					image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
+					image_i = cv2.resize(
+						image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+						(original_dim[i][1], original_dim[i][0])
+					)
 
 				# Generating word-bbox given character and affinity heatmap
 
@@ -191,11 +193,6 @@ def synthesize_with_score(dataloader, model, base_target_path):
 					character_bbox, affinity_bbox,
 					character_threshold=config.threshold_character,
 					affinity_threshold=config.threshold_affinity)
-
-				if 'error_message' in generated_targets.keys():
-					print('There was an error while generating the target of ', image_name[i])
-					print('Error:', generated_targets['error_message'])
-					continue
 
 				if config.visualize_generated:
 
@@ -386,7 +383,7 @@ def generator_(base_target_path, model_path=None, model=None):
 
 	# Dataloader to pre-process images given in the dataset and provide annotations to generate weight
 
-	infer_dataloader = DataLoaderEvalICDAR2013()
+	infer_dataloader = DataLoaderEvalICDAR2013('train')
 
 	infer_dataloader = DataLoader(
 		infer_dataloader, batch_size=config.batch_size['test'],

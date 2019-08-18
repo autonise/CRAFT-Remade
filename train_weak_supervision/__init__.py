@@ -1,4 +1,4 @@
-from .trainer import train
+from .trainer import train, test
 from src.model import UNetWithResnet50Encoder
 import train_weak_supervision.config as config
 from train_synth.synthesize import generator_

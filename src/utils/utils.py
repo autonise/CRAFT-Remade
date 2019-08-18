@@ -128,6 +128,14 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 		found_no = -1
 
+		characters, affinity = cutter(word_bbox=orig_annot, num_characters=len(original_annotation['text'][orig_no]))
+
+		aligned_generated_targets['characters'][orig_no] = characters
+		aligned_generated_targets['affinity'][orig_no] = affinity
+		aligned_generated_targets['weights'][orig_no] = 1
+
+		continue
+
 		for no, gen_t in enumerate(generated_targets['word_bbox']):
 
 			if calc_iou(np.array(gen_t), np.array(orig_annot)) > threshold:
@@ -251,15 +259,11 @@ def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold,
 	# In the beginning of training number of character predictions might be too high because the model performs poorly
 	# Hence the check below does not waste time in calculating the f-score
 
-	if len(all_characters) > 1000:
-
+	if len(all_characters) > 1000 or len(all_joins) > 1000:
 		return {
-			'error_message': 'Number of characters too high'
-		}
-
-	if len(all_joins) > 1000:
-		return {
-			'error_message': 'Number of characters too high'
+			'word_bbox': np.zeros([0, 4, 1, 2]),
+			'characters': [],
+			'affinity': []
 		}
 
 	# Converting all affinity-contours and character-contours to affinity-bbox and character-bbox
