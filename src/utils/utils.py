@@ -73,7 +73,7 @@ def cutter(word_bbox, num_characters):
 	return char_bbox.astype(np.int64), affinity_bbox.astype(np.int64)
 
 
-def get_weighted_character_target(generated_targets, original_annotation, unknown_symbol, threshold):
+def get_weighted_character_target(generated_targets, original_annotation, unknown_symbol, threshold, weight_threshold):
 
 	"""
 
@@ -135,32 +135,30 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 				found_no = no
 				break
 
-		if found_no == -1:
+		if original_annotation['text'][orig_no] == unknown_symbol:
+
+			"""
+				If the current original annotation was predicted by the model but the text-annotation is not present 
+				then we create character bbox using predictions and give a weight of 0.5 to the word-bbox
+			"""
+			characters, affinity = cutter(word_bbox=orig_annot, num_characters=len(original_annotation['text'][orig_no]))
+
+			aligned_generated_targets['characters'][orig_no] = characters
+			aligned_generated_targets['affinity'][orig_no] = affinity
+			aligned_generated_targets['weights'][orig_no] = 0
+
+		elif found_no == -1:
 
 			"""
 				If the current original annotation was not predicted by the model then we create equi-spaced character
 				bbox and give a weight of 0.5 to the word-bbox
 			"""
 
-			# ToDo - What should be done in this scenario?
-			#  If not found and unknown_symbol is there this will create problems
-
 			characters, affinity = cutter(word_bbox=orig_annot, num_characters=len(original_annotation['text'][orig_no]))
 
 			aligned_generated_targets['characters'][orig_no] = characters
 			aligned_generated_targets['affinity'][orig_no] = affinity
-			aligned_generated_targets['weights'][orig_no] = 0.5
-
-		elif original_annotation['text'][orig_no] == unknown_symbol:
-
-			"""
-				If the current original annotation was predicted by the model but the text-annotation is not present 
-				then we create character bbox using predictions and give a weight of 0.5 to the word-bbox
-			"""
-
-			aligned_generated_targets['weights'][orig_no] = 0.5
-			aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
-			aligned_generated_targets['affinity'][orig_no] = generated_targets['affinity'][found_no]
+			aligned_generated_targets['weights'][orig_no] = 0.8
 
 		else:
 
@@ -173,16 +171,16 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 			weight = weighing_function(len(original_annotation['text'][orig_no]), len(generated_targets['characters'][found_no]))
 
-			if weight < 0.5:
+			if weight <= weight_threshold:
 				characters, affinity = cutter(orig_annot, len(original_annotation['text'][orig_no]))
 
 				aligned_generated_targets['characters'][orig_no] = characters
 				aligned_generated_targets['affinity'][orig_no] = affinity
-				aligned_generated_targets['weights'][orig_no] = 0.5
+				aligned_generated_targets['weights'][orig_no] = 0.8
 			else:
-				aligned_generated_targets['weights'][orig_no] = weight
 				aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
 				aligned_generated_targets['affinity'][orig_no] = generated_targets['affinity'][found_no]
+				aligned_generated_targets['weights'][orig_no] = weight
 
 	return aligned_generated_targets
 
@@ -251,15 +249,11 @@ def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold,
 	# In the beginning of training number of character predictions might be too high because the model performs poorly
 	# Hence the check below does not waste time in calculating the f-score
 
-	if len(all_characters) > 1000:
-
+	if len(all_characters) > 1000 or len(all_joins) > 1000:
 		return {
-			'error_message': 'Number of characters too high'
-		}
-
-	if len(all_joins) > 1000:
-		return {
-			'error_message': 'Number of characters too high'
+			'word_bbox': np.zeros([0, 4, 1, 2]),
+			'characters': [],
+			'affinity': []
 		}
 
 	# Converting all affinity-contours and character-contours to affinity-bbox and character-bbox
@@ -461,7 +455,7 @@ def join(characters, joints, return_characters=False):
 	the nodes(char-bbox and affinity-bbox) compromising the word-polygon. This way the word-polygon is found
 
 	:param characters: type=np.array, dtype=np.int64, shape=[num_chars, 4, 1, 2]
-	:param joints: type=np.array, dtype=np.int64, shape=[num_chars, 4, 1, 2]
+	:param joints: type=np.array, dtype=np.int64, shape=[num_affinity, 4, 1, 2]
 	:param return_characters: a bool to toggle returning of character bbox corresponding to each word-polygon
 	:return:
 		all_word_contours: type = np.array, dtype=np.int64, shape=[num_words, 4, 1, 2]
@@ -505,7 +499,7 @@ def join(characters, joints, return_characters=False):
 		else:
 			all_affinity_contours.append(np.zeros([0, 4, 1, 2]))
 
-	all_word_contours = np.array(all_word_contours, dtype=np.int64)
+	all_word_contours = np.array(all_word_contours, dtype=np.int64).reshape([len(all_word_contours), 4, 1, 2])
 
 	if return_characters:
 		return all_word_contours, all_character_contours, all_affinity_contours

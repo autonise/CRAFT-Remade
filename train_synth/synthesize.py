@@ -1,8 +1,8 @@
 import train_synth.config as config
 from src.model import UNetWithResnet50Encoder
-from train_synth.dataloader import DataLoaderEval, generate_affinity_others, generate_target_others
+from train_synth.dataloader import DataLoaderEval, generate_target_others
 from src.utils.parallel import DataParallelModel
-from src.utils.utils import generate_word_bbox, get_weighted_character_target
+from src.utils.utils import generate_word_bbox, get_weighted_character_target, calculate_fscore
 
 import cv2
 import json
@@ -119,7 +119,7 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character, base_
 					cmap='gray')
 
 
-def synthesize_with_score(dataloader, model, base_target_path):
+def synthesize_with_score(dataloader, model, base_target_path, iteration):
 
 	"""
 	Given a path to a set of images(icdar 2013 dataset), and path to a pre-trained model, generate the character heatmap
@@ -134,6 +134,8 @@ def synthesize_with_score(dataloader, model, base_target_path):
 
 		model.eval()
 		iterator = tqdm(dataloader)
+
+		mean_f_score = []
 
 		for no, (image, image_name, original_dim, item) in enumerate(iterator):
 
@@ -153,6 +155,8 @@ def synthesize_with_score(dataloader, model, base_target_path):
 
 			output = output.data.cpu().numpy()
 			original_dim = original_dim.cpu().numpy()
+
+			f_score = []
 
 			for i in range(output.shape[0]):
 
@@ -175,12 +179,13 @@ def synthesize_with_score(dataloader, model, base_target_path):
 					output[i, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
 					(original_dim[i][1], original_dim[i][0]))/255
 
-				image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
-				image_i = cv2.resize(
-					image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-					(original_dim[i][1], original_dim[i][0])
-				)
-				image_i_backup = image_i.copy()
+				if config.visualize_generated:
+
+					image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
+					image_i = cv2.resize(
+						image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+						(original_dim[i][1], original_dim[i][0])
+					)
 
 				# Generating word-bbox given character and affinity heatmap
 
@@ -188,11 +193,6 @@ def synthesize_with_score(dataloader, model, base_target_path):
 					character_bbox, affinity_bbox,
 					character_threshold=config.threshold_character,
 					affinity_threshold=config.threshold_affinity)
-
-				if 'error_message' in generated_targets.keys():
-					print('There was an error while generating the target of ', image_name[i])
-					print('Error:', generated_targets['error_message'])
-					continue
 
 				if config.visualize_generated:
 
@@ -217,12 +217,17 @@ def synthesize_with_score(dataloader, model, base_target_path):
 						base_target_path + '_predicted/word_bbox/' + '.'.join(image_name[i].split('.')[:-1]) + '.png',
 						image_i)
 
+				predicted_word_bbox = generated_targets['word_bbox'].copy()
 				# --------------- PostProcessing for creating the targets for the next iteration ---------------- #
 
 				generated_targets = get_weighted_character_target(
 					generated_targets, {'bbox': annots[i]['bbox'], 'text': annots[i]['text']},
 					dataloader.dataset.unknown,
-					config.threshold_fscore)
+					config.threshold_fscore, config.weight_threshold[iteration])
+
+				target_word_bbox = generated_targets['word_bbox'].copy()
+
+				f_score.append(calculate_fscore(predicted_word_bbox[:, :, 0, :], target_word_bbox[:, :, 0, :]))
 
 				if config.visualize_generated:
 
@@ -285,6 +290,10 @@ def synthesize_with_score(dataloader, model, base_target_path):
 				with open(base_target_path + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.json', 'w') as f:
 					json.dump(generated_targets, f)
 
+			mean_f_score.append(np.mean(f_score))
+
+			iterator.set_description('F-score: '+ str(np.mean(mean_f_score)))
+
 
 def main(
 		folder_path,
@@ -342,7 +351,7 @@ def main(
 	synthesize(infer_dataloader, model, base_path_affinity, base_path_character, base_path_bbox)
 
 
-def generator_(base_target_path, model_path=None, model=None):
+def generator_(base_target_path, iteration, model_path=None, model=None):
 
 	from train_weak_supervision.dataloader import DataLoaderEvalICDAR2013
 
@@ -374,7 +383,7 @@ def generator_(base_target_path, model_path=None, model=None):
 
 	# Dataloader to pre-process images given in the dataset and provide annotations to generate weight
 
-	infer_dataloader = DataLoaderEvalICDAR2013()
+	infer_dataloader = DataLoaderEvalICDAR2013('train')
 
 	infer_dataloader = DataLoader(
 		infer_dataloader, batch_size=config.batch_size['test'],
@@ -393,4 +402,4 @@ def generator_(base_target_path, model_path=None, model=None):
 		saved_model = torch.load(model_path)
 		model.load_state_dict(saved_model['state_dict'])
 
-	synthesize_with_score(infer_dataloader, model, base_target_path)
+	synthesize_with_score(infer_dataloader, model, base_target_path, iteration)

@@ -7,7 +7,7 @@ import json
 
 import train_weak_supervision.config as config
 from train_synth.dataloader import resize, resize_generated
-from train_synth.dataloader import generate_affinity, generate_target, generate_target_others, generate_affinity_others
+from train_synth.dataloader import generate_affinity, generate_target, generate_target_others
 
 
 DEBUG = False
@@ -23,60 +23,62 @@ class DataLoaderMIX(data.Dataset):
 
 		self.type_ = type_
 		self.base_path_synth = config.DataLoaderSYNTH_base_path
-		self.base_path_other_images = config.ICDAR2013_path+'/Images'
+		self.base_path_other_images = config.ICDAR2013_path+'/Images/'+type_
 		self.base_path_other_gt = config.ICDAR2013_path+'/Generated/'+str(iteration)
 
-		if DEBUG:  # Make this True if you want to do a run on small set of Synth-Text
-			if not os.path.exists('cache.pkl'):
+		if config.prob_synth != 0:
 
-				# Create cache of 1000 samples if it does not exist
+			if DEBUG:  # Make this True if you want to do a run on small set of Synth-Text
+				if not os.path.exists('cache.pkl'):
 
-				with open('cache.pkl', 'wb') as f:
-					import pickle
-					from scipy.io import loadmat
-					mat = loadmat(config.DataLoaderSYNTH_mat)
-					pickle.dump([mat['imnames'][0][0:1000], mat['charBB'][0][0:1000], mat['txt'][0][0:1000]], f)
-					print('Created the pickle file, rerun the program')
-					exit(0)
-			else:
+					# Create cache of 1000 samples if it does not exist
 
-				# Read the Cache
+					with open('cache.pkl', 'wb') as f:
+						import pickle
+						from scipy.io import loadmat
+						mat = loadmat(config.DataLoaderSYNTH_mat)
+						pickle.dump([mat['imnames'][0][0:1000], mat['charBB'][0][0:1000], mat['txt'][0][0:1000]], f)
+						print('Created the pickle file, rerun the program')
+						exit(0)
+				else:
 
-				with open('cache.pkl', 'rb') as f:
-					import pickle
-					self.imnames, self.charBB, self.txt = pickle.load(f)
-					print('Loaded DEBUG')
+					# Read the Cache
 
-		else:
-
-			from scipy.io import loadmat
-			mat = loadmat(config.DataLoaderSYNTH_mat)  # Loads MATLAB .mat extension as a dictionary of numpy arrays
-
-			# Read documentation of how synth-text dataset is stored to understand the processing at
-			# http://www.robots.ox.ac.uk/~vgg/data/scenetext/readme.txt
-
-			total_number = mat['imnames'][0].shape[0]
-			train_images = int(total_number * 0.9)
-
-			if self.type_ == 'train':
-
-				self.imnames = mat['imnames'][0][0:train_images]
-				self.charBB = mat['charBB'][0][0:train_images]  # number of images, 2, 4, num_character
-				self.txt = mat['txt'][0][0:train_images]
+					with open('cache.pkl', 'rb') as f:
+						import pickle
+						self.imnames, self.charBB, self.txt = pickle.load(f)
+						print('Loaded DEBUG')
 
 			else:
 
-				self.imnames = mat['imnames'][0][train_images:]
-				self.charBB = mat['charBB'][0][train_images:]  # number of images, 2, 4, num_character
-				self.txt = mat['txt'][0][train_images:]
+				from scipy.io import loadmat
+				mat = loadmat(config.DataLoaderSYNTH_mat)  # Loads MATLAB .mat extension as a dictionary of numpy arrays
 
-		for no, i in enumerate(self.txt):
-			all_words = []
-			for j in i:
-				all_words += [k for k in ' '.join(j.split('\n')).split() if k != '']
-				# Getting all words given paragraph like text in SynthText
+				# Read documentation of how synth-text dataset is stored to understand the processing at
+				# http://www.robots.ox.ac.uk/~vgg/data/scenetext/readme.txt
 
-			self.txt[no] = all_words
+				total_number = mat['imnames'][0].shape[0]
+				train_images = int(total_number * 0.9)
+
+				if self.type_ == 'train':
+
+					self.imnames = mat['imnames'][0][0:train_images]
+					self.charBB = mat['charBB'][0][0:train_images]  # number of images, 2, 4, num_character
+					self.txt = mat['txt'][0][0:train_images]
+
+				else:
+
+					self.imnames = mat['imnames'][0][train_images:]
+					self.charBB = mat['charBB'][0][train_images:]  # number of images, 2, 4, num_character
+					self.txt = mat['txt'][0][train_images:]
+
+			for no, i in enumerate(self.txt):
+				all_words = []
+				for j in i:
+					all_words += [k for k in ' '.join(j.split('\n')).split() if k != '']
+					# Getting all words given paragraph like text in SynthText
+
+				self.txt[no] = all_words
 
 		self.gt = []
 
@@ -84,13 +86,16 @@ class DataLoaderMIX(data.Dataset):
 			with open(self.base_path_other_gt+'/'+i, 'r') as f:
 				self.gt.append(['.'.join(i.split('.')[:-1]) + '.jpg', json.load(f)])
 
-	def __getitem__(self, item):
+	def __getitem__(self, item_i):
 
-		if np.random.uniform() < config.prob_synth:  # probability of picking a Synth-Text image vs Image from dataset
+		if np.random.uniform() < config.prob_synth and self.type_ == 'train':
+			# probability of picking a Synth-Text image vs Image from dataset
 
-			image = plt.imread(self.base_path_synth+'/'+self.imnames[item][0])  # Read the image
+			random_item = np.random.randint(len(self.imnames))
+
+			image = plt.imread(self.base_path_synth+'/'+self.imnames[random_item][0])  # Read the image
 			height, width, channel = image.shape
-			image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
+			image, character = resize(image, self.charBB[random_item].copy())  # Resize the image to (768, 768)
 			image = image.transpose(2, 0, 1)/255
 
 			# Generate character heatmap with weights
@@ -99,17 +104,20 @@ class DataLoaderMIX(data.Dataset):
 			# Generate affinity heatmap with weights
 			weight_affinity, weak_supervision_affinity = generate_affinity(
 				image.shape, character.copy(),
-				self.txt[item].copy(),
+				self.txt[random_item].copy(),
 				weight=1)
 
-			word_bbox = np.array([item, -1])
+			word_bbox = np.array([random_item, -1])
 
 		else:
 
-			image = plt.imread(self.base_path_other_images+'/'+self.gt[item % len(self.gt)][0])  # Read the image
+			random_item = np.random.randint(len(self.gt))
+			image = plt.imread(self.base_path_other_images+'/'+self.gt[random_item][0])  # Read the image
 			height, width, channel = image.shape
-			character = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['characters'].copy()]
-			affinity = [np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[item % len(self.gt)][1]['affinity'].copy()]
+			character = [
+				np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[random_item][1]['characters'].copy()]
+			affinity = [
+				np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[random_item][1]['affinity'].copy()]
 
 			assert len(character) == len(affinity), 'word length different in character and affinity'
 
@@ -117,7 +125,7 @@ class DataLoaderMIX(data.Dataset):
 			image, character, affinity = resize_generated(image, character.copy(), affinity.copy())
 
 			image = image.transpose(2, 0, 1) / 255
-			weights = [i for i in self.gt[item % len(self.gt)][1]['weights'].copy()]
+			weights = [i for i in self.gt[random_item][1]['weights'].copy()]
 
 			# Generate character heatmap with weights
 			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights.copy())
@@ -126,7 +134,7 @@ class DataLoaderMIX(data.Dataset):
 			weight_affinity, weak_supervision_affinity = generate_target_others(image.shape, affinity.copy(), weights.copy())
 
 			# Get original word_bbox annotations
-			word_bbox = np.array([item, 1])
+			word_bbox = np.array([random_item, 1])
 
 		return \
 			image.astype(np.float32), \
@@ -139,7 +147,12 @@ class DataLoaderMIX(data.Dataset):
 
 	def __len__(self):
 
-		return config.iterations
+		if self.type_ == 'train':
+
+			return config.iterations
+		else:
+
+			return len(self.gt)
 
 
 class DataLoaderEvalICDAR2013(data.Dataset):
@@ -148,10 +161,11 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 		ICDAR 2013 dataloader
 	"""
 
-	def __init__(self):
+	def __init__(self, type_):
 
-		self.base_path = config.ICDAR2013_path
-		with open(self.base_path+'/gt.json', 'r') as f:
+		self.type_ = type_
+		self.base_path = config.ICDAR2013_path+'/Images/'
+		with open(self.base_path+self.type_+'_gt.json', 'r') as f:
 			self.gt = json.load(f)
 
 		self.imnames = sorted(self.gt['annots'].keys())
@@ -165,7 +179,7 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 		:return:
 		"""
 
-		image = plt.imread(self.base_path+'/Images/'+self.imnames[item])
+		image = plt.imread(self.base_path+self.type_+'/'+self.imnames[item])
 
 		height, width, channel = image.shape
 		max_side = max(height, width)

@@ -8,7 +8,7 @@
 - [ ] Expose pre-trained models with command line interface to synthesize results on custom images
 
 
-## Cone the repository
+## Clone the repository
 
     git clone https://github.com/autonise/CRAFT-Remade.git
     cd CRAFT-Remade

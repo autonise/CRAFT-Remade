@@ -72,8 +72,7 @@ def resize(image, character, side=768):
 		Resizing the image while maintaining the aspect ratio and padding with average of the entire image to make the
 		reshaped size = (side, side)
 		:param image: np.array, dtype=np.uint8, shape=[height, width, 3]
-		ToDo - Find the exact dimensions of the character bbox and merge resize and resize_generated functions
-		:param character: np.array, dtype=np.int32 or np.float32, shape = [2, something, something]
+		:param character: np.array, dtype=np.int32 or np.float32, shape = [2, 4, num_characters]
 		:param side: new size to be reshaped to
 		:return: resized_image, corresponding reshaped character bbox
 	"""
@@ -146,33 +145,22 @@ def add_character(image, bbox):
 		:return: image in which the gaussian character bbox has been added
 	"""
 
-	backup = image.copy()
-
-	try:
-
-		# ToDo - handle the case when the bbox co-ordinates are outside the image which causes the try-except block to
-		#   be triggered
-
-		top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
-		if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
-			return image
-		bbox -= top_left[None, :]
-		transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32))
-
-		start_row = max(top_left[1], 0) - top_left[1]
-		start_col = max(top_left[0], 0) - top_left[0]
-		end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
-		end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
-		image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
-			transformed[
-			start_row:end_row - top_left[1],
-			start_col:end_col - top_left[0]]
-
+	top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
+	if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
 		return image
+	bbox -= top_left[None, :]
+	transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32))
 
-	except:
+	start_row = max(top_left[1], 0) - top_left[1]
+	start_col = max(top_left[0], 0) - top_left[0]
+	end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
+	end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
+	image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+		transformed[
+		start_row:end_row - top_left[1],
+		start_col:end_col - top_left[0]]
 
-		return backup
+	return image
 
 
 def add_character_others(image, weight_map, weight_val, bbox):
@@ -186,38 +174,27 @@ def add_character_others(image, weight_map, weight_val, bbox):
 					weight_map in which the weight as per weak-supervision has been calculated
 	"""
 
-	backup = (image.copy(), weight_map.copy())
-
-	try:
-
-		# ToDo - handle the case when the bbox co-ordinates are outside the image which causes the try-except block to
-		#   be triggered
-
-		top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
-		if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
-			return image, weight_map
-		bbox -= top_left[None, :]
-		transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32))
-
-		start_row = max(top_left[1], 0) - top_left[1]
-		start_col = max(top_left[0], 0) - top_left[0]
-		end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
-		end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
-		image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
-			transformed[
-			start_row:end_row - top_left[1],
-			start_col:end_col - top_left[0]]
-
-		weight_map[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
-			np.float32(transformed[
-				start_row:end_row - top_left[1],
-				start_col:end_col - top_left[0]] != 0)*weight_val
-
+	top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
+	if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
 		return image, weight_map
+	bbox -= top_left[None, :]
+	transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32))
 
-	except:
+	start_row = max(top_left[1], 0) - top_left[1]
+	start_col = max(top_left[0], 0) - top_left[0]
+	end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
+	end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
+	image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+		transformed[
+		start_row:end_row - top_left[1],
+		start_col:end_col - top_left[0]]
 
-		return backup
+	weight_map[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+		np.float32(transformed[
+			start_row:end_row - top_left[1],
+			start_col:end_col - top_left[0]] != 0)*weight_val
+
+	return image, weight_map
 
 
 def add_affinity(image, bbox_1, bbox_2):
@@ -233,26 +210,15 @@ def add_affinity(image, bbox_1, bbox_2):
 	bbox_1 = order_points(bbox_1)
 	bbox_2 = order_points(bbox_2)
 
-	backup = image.copy()
+	center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
+	tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
+	bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
+	tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
+	br = np.mean([bbox_2[2], bbox_2[3], center_2], axis=0)
 
-	try:
+	affinity = np.array([tl, tr, br, bl])
 
-		# ToDo - handle the case when the bbox co-ordinates are outside the image which causes the try-except block to
-		#   be triggered
-
-		center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
-		tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
-		bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
-		tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
-		br = np.mean([bbox_2[2], bbox_2[3], center_2], axis=0)
-
-		affinity = np.array([tl, tr, br, bl])
-
-		return add_character(image, affinity)
-
-	except:
-
-		return backup
+	return add_character(image, affinity)
 
 
 def two_char_bbox_to_affinity(bbox_1, bbox_2):
@@ -311,14 +277,12 @@ def generate_target(image_size, character_bbox, weight=None):
 	"""
 
 	:param image_size: size of the image on which the target needs to be generated
-	:param character_bbox: np.array, shape = [something, something ..] ToDo - Find the shape of the character bbox
+	:param character_bbox: np.array, shape = [2, 4, num_characters]
 	:param weight: this function is currently only used for synth-text in which we have 100 % confidence so weight = 1
 					where the character bbox are present
 	:return: if weight is not None then target_character_heatmap otherwise target_character_heatmap,
 																			weight for weak-supervision
 	"""
-
-	# ToDo - Merge generate_target and generate_target_others. One is for synth-text and the other is for icdar 2013
 
 	character_bbox = character_bbox.transpose(2, 1, 0)
 
@@ -340,14 +304,12 @@ def generate_target_others(image_size, character_bbox, weight):
 	"""
 
 		:param image_size: size of the image on which the target needs to be generated
-		:param character_bbox: np.array, shape = [something, something ..] ToDo - Find the shape of the character bbox
+		:param character_bbox: np.array, shape = [word_length, num_characters, 4, 1, 2]
 		:param weight: this function is currently only used for icdar2013, so weight is the value of weight
 																							for each character bbox
 		:return: if weight is not None then target_character_heatmap otherwise target_character_heatmap,
 																				weight for weak-supervision
 		"""
-
-	# ToDo - Merge generate_target and generate_target_others. One is for synth-text and the other is for icdar 2013
 
 	if len(image_size) == 2:
 		height, width = image_size
@@ -361,7 +323,8 @@ def generate_target_others(image_size, character_bbox, weight):
 
 		for i in range(character_bbox[word_no].shape[0]):
 
-			target, weight_map = add_character_others(target, weight_map, weight[word_no], character_bbox[word_no][i].copy()[:, 0, :])
+			target, weight_map = add_character_others(
+				target, weight_map, weight[word_no], character_bbox[word_no][i].copy()[:, 0, :])
 
 	return target/255, weight_map
 
@@ -379,8 +342,6 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 																				weight for weak-supervision
 
 	"""
-
-	# ToDo - merge the generate_affinity function with generate_affinity_others function
 
 	character_bbox = character_bbox.transpose(2, 1, 0)
 
@@ -418,8 +379,6 @@ def generate_affinity_others(image_size, character_bbox, weight):
 	:return: target_affinity_heatmap, weight for weak-supervision
 
 	"""
-
-	# ToDo - merge the generate_affinity function with generate_affinity_others function
 
 	if len(image_size) == 2:
 		height, width = image_size
