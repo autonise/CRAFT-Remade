@@ -36,7 +36,7 @@ SynthText - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<b
     
 ### Weak Supervision
 
-- [ ] ICDAR 2013 - yet_to_be_completed
+- [ ] ICDAR 2013 - In Progress
 - [ ] ICDAR 2015 - yet_to_be_completed
 - [ ] ICDAR 2017 - yet_to_be_completed
 - [ ] Total Text - yet_to_be_completed
@@ -44,7 +44,7 @@ SynthText - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<b
     
 ## Pre-generated on popular data sets
 
-- [ ] ICDAR 2013 - yet_to_be_completed
+- [ ] ICDAR 2013 - In Progress
 - [ ] ICDAR 2015 - yet_to_be_completed
 - [ ] ICDAR 2017 - yet_to_be_completed
 - [ ] Total Text - yet_to_be_completed
