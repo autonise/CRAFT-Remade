@@ -99,6 +99,10 @@ def weak_supervision(model, iterations):
 
 	model, optimizer = get_initial_model_optimizer(model)
 
+	pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+	print('Number of parameters in the model:', pytorch_total_params)
+
 	"""
 	Steps - 
 		1) Using the pre-trained model generate the targets
@@ -119,10 +123,10 @@ def weak_supervision(model, iterations):
 		print('Test Results for iteration:', iteration, ' | F-score: ', f_score_test)
 
 		print('Fine-tuning for iteration:', iteration)
-		model, optimizer = train(model, optimizer, iteration)
+		model, optimizer, loss, accuracy = train(model, optimizer, iteration)
 
 		print('Saving for iteration:', iteration)
-		save_model(model, optimizer, 'intermediate', iteration)
+		save_model(model, optimizer, 'intermediate', iteration, loss=loss, accuracy=accuracy)
 
 	save_model(model, optimizer, 'final')
 

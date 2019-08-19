@@ -75,6 +75,16 @@ def train(model, optimizer, iteration):
 	:return: model, optimizer
 	"""
 
+	def change_lr():
+
+		# Change learning rate while training
+		for param_group in optimizer.param_groups:
+			param_group['lr'] = config.lr[iteration]
+
+		print('Learning Rate Changed to ', config.lr[iteration])
+
+	change_lr()
+
 	dataloader = DataLoader(
 		DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=8, shuffle=True)
 	loss_criterian = DataParallelCriterion(Criterian())
@@ -82,16 +92,6 @@ def train(model, optimizer, iteration):
 	model.train()
 	optimizer.zero_grad()
 	iterator = tqdm(dataloader)
-
-	def change_lr(no_i):
-
-		# Change learning rate while training
-
-		for i in config.lr:
-			if i == no_i:
-				print('Learning Rate Changed to ', config.lr[i])
-				for param_group in optimizer.param_groups:
-					param_group['lr'] = config.lr[i]
 
 	all_loss = []
 	all_accuracy = []
@@ -101,8 +101,6 @@ def train(model, optimizer, iteration):
 
 	for no, (image, character_map, affinity_map, character_weight, affinity_weight, word_bbox, original_dim) in \
 		enumerate(iterator):
-
-		change_lr(no)
 
 		if config.use_cuda:
 			image, character_map, affinity_map = image.cuda(), character_map.cuda(), affinity_map.cuda()
@@ -138,14 +136,6 @@ def train(model, optimizer, iteration):
 
 			if _[1] == 1:
 
-				# os.makedirs('Check/'+str(no), exist_ok=True)
-				#
-				# plt.imsave('Check/'+str(no)+'/image_'+str(__)+'.png', image[__].data.cpu().numpy().transpose(1, 2, 0))
-				# plt.imsave('Check/'+str(no)+'/character_map_'+str(__)+'.png', image[__].data.cpu().numpy().transpose(1, 2, 0)*character_map[__].data.cpu().numpy()[:, :, None])
-				# plt.imsave('Check/'+str(no)+'/affinity_map_'+str(__)+'.png', image[__].data.cpu().numpy().transpose(1, 2, 0)*affinity_map[__].data.cpu().numpy()[:, :, None])
-				# plt.imsave('Check/'+str(no)+'/character_weight_'+str(__)+'.png', character_map[__].data.cpu().numpy()*character_weight[__].data.cpu().numpy(), cmap='gray')
-				# plt.imsave('Check/'+str(no)+'/affinity_weight_'+str(__)+'.png', affinity_map[__].data.cpu().numpy()*affinity_weight[__].data.cpu().numpy(), cmap='gray')
-
 				# ToDo - Understand why model.train() gives poor results but model.eval() with torch.no_grad() gives better results
 
 				max_dim = original_dim[__].max()
@@ -165,13 +155,6 @@ def train(model, optimizer, iteration):
 					output[__, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
 					(original_dim[__][1], original_dim[__][0])) / 255
 
-				# plt.imsave('char_heatmap_after.png', character_bbox, cmap='gray')
-				#
-				# image_i = cv2.resize(
-				# 	np.uint8(image[__, :, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad +
-				# 	before_pad_dim[1]]*255).transpose(1, 2, 0),
-				# 	(original_dim[__][1], original_dim[__][0]))
-
 				predicted_bbox = generate_word_bbox(
 					character_bbox,
 					affinity_bbox,
@@ -180,11 +163,6 @@ def train(model, optimizer, iteration):
 
 				predicted_ic13.append(predicted_bbox)
 				target_bbox.append(np.array(ground_truth[_[0] % len(ground_truth)][1]['word_bbox'], dtype=np.int64))
-
-				# cv2.drawContours(image_i, target_bbox[-1], -1, (0, 255, 0), 2)
-				# cv2.drawContours(image_i, predicted_bbox, -1, (255, 0, 0), 2)
-				#
-				# plt.imsave(str(__) + '.png', image_i)
 
 				current_count += 1
 
@@ -206,10 +184,10 @@ def train(model, optimizer, iteration):
 			f_score = 0
 
 		iterator.set_description(
-			'Loss:' + str(int(loss.item() * 4 * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
+			'Loss:' + str(int(loss.item() * 4 * 100000) / 100000) + ' Iterations:[' + str(no) + '/' + str(
 				len(iterator)) +
 			'] Average Loss:' + str(
-				int(np.array(all_loss)[-min(1000, len(all_loss)):].mean() * 100000000) / 100000000) +
+				int(np.array(all_loss)[-min(1000, len(all_loss)):].mean() * 100000) / 100000) +
 			'| Average F-Score: ' + str(f_score)
 		)
 
@@ -220,7 +198,7 @@ def train(model, optimizer, iteration):
 
 	torch.cuda.empty_cache()
 
-	return model, optimizer
+	return model, optimizer, all_loss, all_accuracy
 
 
 def test(model):

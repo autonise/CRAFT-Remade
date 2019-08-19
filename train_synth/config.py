@@ -36,6 +36,19 @@ DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
 DataLoaderSYNTH_mat = '/home/SharedData/Mayank/SynthText/gt.mat'
 DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'
 
-ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2013'
+ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2015'
 
 visualize_generated = False
+
+
+def get_weight_threshold(min_, max_, iteration):
+	import numpy as np
+	weight_threshold_ = []
+	for i in range(iteration-1):
+		weight_threshold_.append(min_ + i*(max_ - min_)/(iteration-1))
+
+	weight_threshold_.append(max_)
+	return np.flip(np.array(weight_threshold_))
+
+
+weight_threshold = get_weight_threshold(0.85, 1, 20)

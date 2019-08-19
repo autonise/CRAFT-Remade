@@ -2,8 +2,18 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="119932cc-1b58-48ee-bc3e-1c17fe5770fd" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/mayank.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/mayank.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ReadMe.md" beforeDir="false" afterPath="$PROJECT_DIR$/ReadMe.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/data_structure.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/train_synth/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/train_synth/synthesize.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/synthesize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/train_weak_supervision/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/train_weak_supervision/trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/trainer.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -65,5 +75,30 @@
         </entry>
       </map>
     </option>
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list />
+          </value>
+        </entry>
+        <entry key="User">
+          <value>
+            <list />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/train_weak_supervision/config.py</url>
+          <line>29</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

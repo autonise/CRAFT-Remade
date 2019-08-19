@@ -119,7 +119,7 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character, base_
 					cmap='gray')
 
 
-def synthesize_with_score(dataloader, model, base_target_path):
+def synthesize_with_score(dataloader, model, base_target_path, iteration):
 
 	"""
 	Given a path to a set of images(icdar 2013 dataset), and path to a pre-trained model, generate the character heatmap
@@ -223,7 +223,7 @@ def synthesize_with_score(dataloader, model, base_target_path):
 				generated_targets = get_weighted_character_target(
 					generated_targets, {'bbox': annots[i]['bbox'], 'text': annots[i]['text']},
 					dataloader.dataset.unknown,
-					config.threshold_fscore)
+					config.threshold_fscore, config.weight_threshold[iteration])
 
 				target_word_bbox = generated_targets['word_bbox'].copy()
 
@@ -351,7 +351,7 @@ def main(
 	synthesize(infer_dataloader, model, base_path_affinity, base_path_character, base_path_bbox)
 
 
-def generator_(base_target_path, model_path=None, model=None):
+def generator_(base_target_path, iteration, model_path=None, model=None):
 
 	from train_weak_supervision.dataloader import DataLoaderEvalICDAR2013
 
@@ -402,4 +402,4 @@ def generator_(base_target_path, model_path=None, model=None):
 		saved_model = torch.load(model_path)
 		model.load_state_dict(saved_model['state_dict'])
 
-	synthesize_with_score(infer_dataloader, model, base_target_path)
+	synthesize_with_score(infer_dataloader, model, base_target_path, iteration)
