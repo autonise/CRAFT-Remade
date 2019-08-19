@@ -12,7 +12,7 @@ save_path = '/home/SharedData/Mayank/Models/WeakSupervision/ICDAR2013'
 images_path = '/home/SharedData/Mayank/ICDAR2013/Images'
 target_path = '/home/SharedData/Mayank/ICDAR2013/Generated'
 
-prob_synth = 0
+prob_synth = 0.5
 
 DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
 DataLoaderSYNTH_mat = '/home/SharedData/Mayank/SynthText/gt.mat'
@@ -28,13 +28,38 @@ batch_size = {
 }
 
 lr = {
-	1: 1e-4,
-	4000: 1e-5,
-	8000: 1e-6,
+	0:
+		{
+			0: 1e-4,
+		},
+	1:
+		{
+			0: 5e-5,
+		},
+	2:
+		{
+			0: 1e-5,
+		},
+	3:
+		{
+			0: 1e-5,
+		},
+	4:
+		{
+			0: 5e-6,
+		},
+	5:
+		{
+			0: 5e-6,
+		},
+	6:
+		{
+			0: 5e-6,
+		},
 }
 
 threshold_character = 0.4
 threshold_affinity = 0.4
 threshold_fscore = 0.5
 
-iterations = batch_size['train']*10000
+iterations = batch_size['train']*1000
