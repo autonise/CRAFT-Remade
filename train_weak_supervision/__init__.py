@@ -1,5 +1,4 @@
 from .trainer import train, test
-from src.model import UNetWithResnet50Encoder
 import train_weak_supervision.config as config
 from train_synth.synthesize import generator_
 from src.utils.parallel import DataParallelModel
@@ -17,16 +16,29 @@ def get_initial_model_optimizer(path):
 	:return: model, optimizer
 	"""
 
-	model = UNetWithResnet50Encoder()
+	if config.model_architecture == "UNET_ResNet":
+		from src.UNET_ResNet import UNetWithResnet50Encoder
+		model = UNetWithResnet50Encoder()
+		model = DataParallelModel(model)
+		saved_model = torch.load(path)
+		model.load_state_dict(saved_model['state_dict'])
+
+	else:
+		from src.craft_model import CRAFT
+		model = CRAFT()
+		model = DataParallelModel(model)
+		saved_model = torch.load(path)
+		model.load_state_dict(saved_model)
 
 	if config.use_cuda:
 		model = model.cuda()
 
-	model = DataParallelModel(model)
-
-	model.load_state_dict(torch.load(path)['state_dict'])
-
 	optimizer = torch.optim.Adam(model.parameters(), lr=config.lr[0])
+
+	# ToDo - Check the effects of using a new optimizer after every iteration or using the previous iteration optimizer
+
+	if config.model_architecture == "UNET_ResNet":
+		optimizer.load_state_dict(saved_model['optimizer'])
 
 	return model, optimizer
 

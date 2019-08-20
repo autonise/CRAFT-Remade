@@ -1,6 +1,6 @@
 from train_weak_supervision.dataloader import DataLoaderMIX, DataLoaderEvalICDAR2013
 import train_weak_supervision.config as config
-from src.model import Criterian
+from src.generic_model import Criterian
 from src.utils.parallel import DataParallelCriterion
 from src.utils.utils import calculate_batch_fscore, generate_word_bbox, calculate_fscore
 

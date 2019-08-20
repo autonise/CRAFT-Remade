@@ -116,8 +116,6 @@ def weak_supervision(model, iterations):
 		print('Generating for iteration:', iteration)
 		generate_target(model, iteration)
 
-		# ToDo - Check the effects of using a new optimizer after every iteration or using the previous iteration optimizer
-
 		print('Testing for iteration:', iteration)
 		f_score_test = test(model)
 		print('Test Results for iteration:', iteration, ' | F-score: ', f_score_test)

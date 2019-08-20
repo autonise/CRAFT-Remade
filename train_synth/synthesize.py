@@ -1,5 +1,4 @@
 import train_synth.config as config
-from src.model import UNetWithResnet50Encoder
 from train_synth.dataloader import DataLoaderEval, generate_target_others
 from src.utils.parallel import DataParallelModel
 from src.utils.utils import generate_word_bbox, get_weighted_character_target, calculate_fscore
@@ -393,7 +392,12 @@ def generator_(base_target_path, iteration, model_path=None, model=None):
 
 		# If model has not been provided, loading it from the path provided
 
-		model = UNetWithResnet50Encoder()
+		if config.model_architecture == 'UNET_ResNet':
+			from src.UNET_ResNet import UNetWithResnet50Encoder
+			model = UNetWithResnet50Encoder()
+		else:
+			from src.craft_model import CRAFT
+			model = CRAFT()
 		model = DataParallelModel(model)
 
 		if config.use_cuda:

@@ -38,7 +38,7 @@ DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_sy
 
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2015'
 
-visualize_generated = False
+visualize_generated = True
 
 
 def get_weight_threshold(min_, max_, iteration):

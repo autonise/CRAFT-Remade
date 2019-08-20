@@ -158,7 +158,7 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 			aligned_generated_targets['characters'][orig_no] = characters
 			aligned_generated_targets['affinity'][orig_no] = affinity
-			aligned_generated_targets['weights'][orig_no] = 0.8
+			aligned_generated_targets['weights'][orig_no] = 0.5
 
 		else:
 
@@ -176,7 +176,7 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 				aligned_generated_targets['characters'][orig_no] = characters
 				aligned_generated_targets['affinity'][orig_no] = affinity
-				aligned_generated_targets['weights'][orig_no] = 0.8
+				aligned_generated_targets['weights'][orig_no] = 0.5
 			else:
 				aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
 				aligned_generated_targets['affinity'][orig_no] = generated_targets['affinity'][found_no]
@@ -193,9 +193,9 @@ def remove_small_predictions(image):
 	:return: image with less stray contours
 	"""
 
-	kernel = np.ones((5, 5), np.uint8)
-	image = cv2.erode(image, kernel, iterations=2)
-	image = cv2.dilate(image, kernel, iterations=3)
+	# kernel = np.ones((5, 5), np.uint8)
+	# image = cv2.erode(image, kernel, iterations=2)
+	# image = cv2.dilate(image, kernel, iterations=3)
 
 	return image
 
