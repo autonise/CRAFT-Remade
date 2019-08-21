@@ -6,7 +6,7 @@ import os
 import json
 
 import train_weak_supervision.config as config
-from train_synth.dataloader import resize, resize_generated
+from train_synth.dataloader import resize, resize_generated, normalize_mean_variance
 from train_synth.dataloader import generate_affinity, generate_target, generate_target_others
 
 
@@ -96,7 +96,7 @@ class DataLoaderMIX(data.Dataset):
 			image = plt.imread(self.base_path_synth+'/'+self.imnames[random_item][0])  # Read the image
 			height, width, channel = image.shape
 			image, character = resize(image, self.charBB[random_item].copy())  # Resize the image to (768, 768)
-			image = image.transpose(2, 0, 1)/255
+			image = normalize_mean_variance(image).transpose(2, 0, 1)
 
 			# Generate character heatmap with weights
 			weight_character, weak_supervision_char = generate_target(image.shape, character.copy(), weight=1)
@@ -123,8 +123,7 @@ class DataLoaderMIX(data.Dataset):
 
 			# Resize the image to (768, 768)
 			image, character, affinity = resize_generated(image, character.copy(), affinity.copy())
-
-			image = image.transpose(2, 0, 1) / 255
+			image = normalize_mean_variance(image).transpose(2, 0, 1)
 			weights = [i for i in self.gt[random_item][1]['weights'].copy()]
 
 			# Generate character heatmap with weights
@@ -190,7 +189,8 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 		big_image[
 			(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
 			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
-		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
+		big_image = normalize_mean_variance(big_image)
+		big_image = big_image.transpose(2, 0, 1)
 
 		return big_image.astype(np.float32), self.imnames[item], np.array([height, width]), item
 

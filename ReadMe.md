@@ -3,7 +3,7 @@
 
 ## Objective
 
-- [ ] Reproduce weak-supervision training as mentioned in the paper https://arxiv.org/pdf/1904.01941.pdf
+- [X] Reproduce weak-supervision training as mentioned in the paper https://arxiv.org/pdf/1904.01941.pdf
 - [ ] Generate character bbox on all the popular data sets.
 - [ ] Expose pre-trained models with command line interface to synthesize results on custom images
 
@@ -37,7 +37,7 @@ SynthText - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<b
 ### Weak Supervision
 
 - [ ] ICDAR 2013 - In Progress
-- [ ] ICDAR 2015 - yet_to_be_completed
+- [ ] ICDAR 2015 - In Progress
 - [ ] ICDAR 2017 - yet_to_be_completed
 - [ ] Total Text - yet_to_be_completed
 - [ ] MS-COCO - yet_to_be_completed
@@ -45,7 +45,7 @@ SynthText - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<b
 ## Pre-generated on popular data sets
 
 - [ ] ICDAR 2013 - In Progress
-- [ ] ICDAR 2015 - yet_to_be_completed
+- [ ] ICDAR 2015 - In Progress
 - [ ] ICDAR 2017 - yet_to_be_completed
 - [ ] Total Text - yet_to_be_completed
 - [ ] MS-COCO - yet_to_be_completed

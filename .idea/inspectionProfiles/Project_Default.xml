@@ -23,6 +23,8 @@
         <list>
           <option value="torch.cat" />
           <option value="torch.backends.cudnn" />
+          <option value="torch.cuda.*" />
+          <option value="torch.backends" />
         </list>
       </option>
     </inspection_tool>

@@ -1,6 +1,5 @@
 import train_synth.config as config
-from src.model import UNetWithResnet50Encoder
-from train_synth.dataloader import DataLoaderEval, generate_target_others
+from train_synth.dataloader import DataLoaderEval, generate_target_others, denormalize_mean_variance
 from src.utils.parallel import DataParallelModel
 from src.utils.utils import generate_word_bbox, get_weighted_character_target, calculate_fscore
 
@@ -68,7 +67,7 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character, base_
 
 				# --------- Resizing it back to the original image size and saving it ----------- #
 
-				image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
+				image_i = denormalize_mean_variance(image[i].data.cpu().numpy().transpose(1, 2, 0))
 
 				max_dim = original_dim[i].max()
 				resizing_factor = 768/max_dim
@@ -98,7 +97,8 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character, base_
 					character_bbox,
 					affinity_bbox,
 					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity)['word_bbox']
+					affinity_threshold=config.threshold_affinity,
+					word_threshold=config.threshold_word)['word_bbox']
 
 				predicted_bbox = [np.array(predicted_bbox_i) for predicted_bbox_i in predicted_bbox]
 
@@ -181,7 +181,8 @@ def synthesize_with_score(dataloader, model, base_target_path, iteration):
 
 				if config.visualize_generated:
 
-					image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
+					image_i = denormalize_mean_variance(image[i].data.cpu().numpy().transpose(1, 2, 0))
+
 					image_i = cv2.resize(
 						image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
 						(original_dim[i][1], original_dim[i][0])
@@ -192,7 +193,8 @@ def synthesize_with_score(dataloader, model, base_target_path, iteration):
 				generated_targets = generate_word_bbox(
 					character_bbox, affinity_bbox,
 					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity)
+					affinity_threshold=config.threshold_affinity,
+					word_threshold=config.threshold_word)
 
 				if config.visualize_generated:
 
@@ -231,7 +233,7 @@ def synthesize_with_score(dataloader, model, base_target_path, iteration):
 
 				if config.visualize_generated:
 
-					image_i = (image[i].data.cpu().numpy() * 255).astype(np.uint8).transpose(1, 2, 0)
+					image_i = denormalize_mean_variance(image[i].data.cpu().numpy().transpose(1, 2, 0))
 					image_i = cv2.resize(
 						image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
 						(original_dim[i][1], original_dim[i][0])
@@ -337,15 +339,19 @@ def main(
 
 		# If model has not been provided, loading it from the path provided
 
-		model = UNetWithResnet50Encoder()
+		if config.model_architecture == 'UNET_ResNet':
+			from src.UNET_ResNet import UNetWithResnet50Encoder
+			model = UNetWithResnet50Encoder()
+		else:
+			from src.craft_model import CRAFT
+			model = CRAFT()
 		model = DataParallelModel(model)
-
-		# ToDo - Can't run pre-trained models on CPU
 
 		if config.use_cuda:
 			model = model.cuda()
-
-		saved_model = torch.load(model_path)
+			saved_model = torch.load(model_path)
+		else:
+			saved_model = torch.load(model_path, map_location='cpu')
 		model.load_state_dict(saved_model['state_dict'])
 
 	synthesize(infer_dataloader, model, base_path_affinity, base_path_character, base_path_bbox)
@@ -393,7 +399,12 @@ def generator_(base_target_path, iteration, model_path=None, model=None):
 
 		# If model has not been provided, loading it from the path provided
 
-		model = UNetWithResnet50Encoder()
+		if config.model_architecture == 'UNET_ResNet':
+			from src.UNET_ResNet import UNetWithResnet50Encoder
+			model = UNetWithResnet50Encoder()
+		else:
+			from src.craft_model import CRAFT
+			model = CRAFT()
 		model = DataParallelModel(model)
 
 		if config.use_cuda:

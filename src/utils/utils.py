@@ -1,8 +1,8 @@
 from shapely.geometry import Polygon
 import numpy as np
 import cv2
-import networkx as nx
 from train_synth.dataloader import two_char_bbox_to_affinity
+import math
 
 
 def poly_to_rect(bbox_contour):
@@ -91,6 +91,8 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 		}
 	:param unknown_symbol: The symbol(string) which denotes that the text was not annotated
 	:param threshold: overlap IOU value above which we consider prediction as positive
+	:param weight_threshold: threshold of predicted_char/target_chars above which we say the prediction will be used as
+								a target in the next iteration
 	:return: aligned_generated_targets: {
 			'word_bbox': contains the word-bbox which have been annotated and present in original annotations,
 							type = np.array, dtype=np.int64, shape = [num_words, 4, 1, 2]
@@ -158,7 +160,7 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 			aligned_generated_targets['characters'][orig_no] = characters
 			aligned_generated_targets['affinity'][orig_no] = affinity
-			aligned_generated_targets['weights'][orig_no] = 0.8
+			aligned_generated_targets['weights'][orig_no] = 0.5
 
 		else:
 
@@ -176,7 +178,7 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 				aligned_generated_targets['characters'][orig_no] = characters
 				aligned_generated_targets['affinity'][orig_no] = affinity
-				aligned_generated_targets['weights'][orig_no] = 0.8
+				aligned_generated_targets['weights'][orig_no] = 0.5
 			else:
 				aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
 				aligned_generated_targets['affinity'][orig_no] = generated_targets['affinity'][found_no]
@@ -185,22 +187,7 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 	return aligned_generated_targets
 
 
-def remove_small_predictions(image):
-
-	"""
-	This function is used to erode small stray character predictions but does not reduce the thickness of big predictions
-	:param image: Predicted character or affinity heat map in uint8
-	:return: image with less stray contours
-	"""
-
-	kernel = np.ones((5, 5), np.uint8)
-	image = cv2.erode(image, kernel, iterations=2)
-	image = cv2.dilate(image, kernel, iterations=3)
-
-	return image
-
-
-def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold, affinity_threshold):
+def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold, affinity_threshold, word_threshold):
 
 	"""
 	Given the character heatmap, affinity heatmap, character and affinity threshold this function generates
@@ -210,6 +197,7 @@ def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold,
 	:param affinity_heatmap: Affinity Heatmap, numpy array, dtype=np.float32, shape = [height, width], value range [0, 1]
 	:param character_threshold: Threshold above which we say pixel belongs to a character
 	:param affinity_threshold: Threshold above which we say a pixel belongs to a affinity
+	:param word_threshold: Threshold of any pixel above which we say a group of characters for a word
 	:return: {
 		'word_bbox': word_bbox, type=np.array, dtype=np.int64, shape=[num_words, 4, 1, 2] ,
 		'characters': char_bbox, type=list of np.array, dtype=np.int64, shape=[num_words, num_characters, 4, 1, 2] ,
@@ -217,70 +205,122 @@ def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold,
 	}
 	"""
 
-	assert character_heatmap.max() <= 1, 'Weight has not been normalised'
-	assert character_heatmap.min() >= 0, 'Weight has not been normalised'
+	character_heatmap = character_heatmap.copy()
+	affinity_heatmap = affinity_heatmap.copy()
+	img_h, img_w = character_heatmap.shape
 
-	# character_heatmap being thresholded
+	""" labeling method """
+	ret, text_score = cv2.threshold(character_heatmap, character_threshold, 1, 0)
+	ret, link_score = cv2.threshold(affinity_heatmap, affinity_threshold, 1, 0)
 
-	character_heatmap[character_heatmap > character_threshold] = 255
-	character_heatmap[character_heatmap != 255] = 0
+	text_score_comb = np.clip(text_score + link_score, 0, 1)
 
-	assert affinity_heatmap.max() <= 1, 'Weight Affinity has not been normalised'
-	assert affinity_heatmap.min() >= 0, 'Weight Affinity has not been normalised'
+	n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+		text_score_comb.astype(np.uint8),
+		connectivity=4)
 
-	# affinity_heatmap being thresholded
+	det = []
+	mapper = []
+	for k in range(1, n_labels):
+		# size filtering
+		size = stats[k, cv2.CC_STAT_AREA]
+		if size < 10:
+			continue
 
-	affinity_heatmap[affinity_heatmap > affinity_threshold] = 255
-	affinity_heatmap[affinity_heatmap != 255] = 0
+		where = labels == k
 
-	character_heatmap = character_heatmap.astype(np.uint8)
-	affinity_heatmap = affinity_heatmap.astype(np.uint8)
+		# thresholding
+		if np.max(character_heatmap[where]) < word_threshold:
+			continue
 
-	# Thresholded heat-maps being removed of stray contours
+		# make segmentation map
+		seg_map = np.zeros(character_heatmap.shape, dtype=np.uint8)
+		seg_map[where] = 255
+		seg_map[np.logical_and(link_score == 1, text_score == 0)] = 0  # remove link area
 
-	character_heatmap = remove_small_predictions(character_heatmap)
-	affinity_heatmap = remove_small_predictions(affinity_heatmap)
+		x, y = stats[k, cv2.CC_STAT_LEFT], stats[k, cv2.CC_STAT_TOP]
+		w, h = stats[k, cv2.CC_STAT_WIDTH], stats[k, cv2.CC_STAT_HEIGHT]
+		niter = int(math.sqrt(size * min(w, h) / (w * h)) * 2)
+		sx, ex, sy, ey = x - niter, x + w + niter + 1, y - niter, y + h + niter + 1
+		# boundary check
+		if sx < 0:
+			sx = 0
+		if sy < 0:
+			sy = 0
+		if ex >= img_w:
+			ex = img_w
+		if ey >= img_h:
+			ey = img_h
+		kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1 + niter, 1 + niter))
+		seg_map[sy:ey, sx:ex] = cv2.dilate(seg_map[sy:ey, sx:ex], kernel)
 
-	# Finding the character and affinity contours
+		# make box
+		np_contours = np.roll(np.array(np.where(seg_map != 0)), 1, axis=0).transpose().reshape(-1, 2)
+		rectangle = cv2.minAreaRect(np_contours)
+		box = cv2.boxPoints(rectangle)
 
-	all_characters, hierarchy = cv2.findContours(character_heatmap, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-	all_joins, hierarchy = cv2.findContours(affinity_heatmap, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+		# align diamond-shape
+		w, h = np.linalg.norm(box[0] - box[1]), np.linalg.norm(box[1] - box[2])
+		box_ratio = max(w, h) / (min(w, h) + 1e-5)
+		if abs(1 - box_ratio) <= 0.1:
+			l, r = min(np_contours[:, 0]), max(np_contours[:, 0])
+			t, b = min(np_contours[:, 1]), max(np_contours[:, 1])
+			box = np.array([[l, t], [r, t], [r, b], [l, b]], dtype=np.float32)
 
-	# In the beginning of training number of character predictions might be too high because the model performs poorly
-	# Hence the check below does not waste time in calculating the f-score
+		# make clock-wise order
+		start_idx = box.sum(axis=1).argmin()
+		box = np.roll(box, 4 - start_idx, 0)
+		box = np.array(box)
 
-	if len(all_characters) > 1000 or len(all_joins) > 1000:
-		return {
-			'word_bbox': np.zeros([0, 4, 1, 2]),
-			'characters': [],
-			'affinity': []
-		}
+		det.append(box)
+		mapper.append(k)
 
-	# Converting all affinity-contours and character-contours to affinity-bbox and character-bbox
+	char_contours, _ = cv2.findContours(text_score.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+	affinity_contours, _ = cv2.findContours(link_score.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-	for ii in range(len(all_characters)):
-		rect = cv2.minAreaRect(all_characters[ii])
-		all_characters[ii] = cv2.boxPoints(rect)[:, None, :]
-
-	for ii in range(len(all_joins)):
-		rect = cv2.minAreaRect(all_joins[ii])
-		all_joins[ii] = cv2.boxPoints(rect)[:, None, :]
-
-	all_characters = np.array(all_characters, dtype=np.int64).reshape([len(all_characters), 4, 1, 2])
-	all_joins = np.array(all_joins, dtype=np.int64).reshape([len(all_joins), 4, 1, 2])
-
-	# The function join_with_characters joins the character_bbox using affinity_bbox to create word-bbox
-
-	all_word_bbox, all_characters_bbox, all_affinity_bbox = join(all_characters, all_joins, return_characters=True)
+	char_contours = link_to_word_bbox(char_contours, det)
+	affinity_contours = link_to_word_bbox(affinity_contours, det)
 
 	return {
-		'word_bbox': all_word_bbox,
-		'characters': all_characters_bbox,
-		'affinity': all_affinity_bbox
+		'word_bbox': np.array(det, dtype=np.int32).reshape([len(det), 4, 1, 2]),
+		'characters': char_contours,
+		'affinity': affinity_contours,
 	}
 
 
-def generate_word_bbox_batch(batch_character_heatmap, batch_affinity_heatmap, character_threshold, affinity_threshold):
+def link_to_word_bbox(to_find, word_bbox):
+
+	if len(word_bbox) == 0:
+		return [np.zeros([0, 4, 1, 2], dtype=np.int32)]
+	word_sorted_character = [[] for _ in word_bbox]
+
+	for cont_i, cont in enumerate(to_find):
+		if cont.shape[0] < 4:
+			continue
+		a = Polygon(cont.reshape([cont.shape[0], 2])).buffer(0)
+		if a.area == 0:
+			continue
+		ratio = np.zeros([len(word_bbox)])
+		for word_i, word in enumerate(word_bbox):
+			b = Polygon(word.reshape([word.shape[0], 2]))
+			ratio[word_i] = a.intersection(b).area/a.area
+
+		rectangle = cv2.minAreaRect(cont)
+		box = cv2.boxPoints(rectangle)
+		word_sorted_character[np.argmax(ratio)].append(box)
+
+	word_sorted_character = [
+		np.array(word_i, dtype=np.int32).reshape([len(word_i), 4, 1, 2]) for word_i in word_sorted_character]
+
+	return word_sorted_character
+
+
+def generate_word_bbox_batch(
+		batch_character_heatmap,
+		batch_affinity_heatmap,
+		character_threshold,
+		affinity_threshold,
+		word_threshold):
 
 	"""
 
@@ -293,6 +333,7 @@ def generate_word_bbox_batch(batch_character_heatmap, batch_affinity_heatmap, ch
 									shape = [batch_size, height, width], value range [0, 1]
 	:param character_threshold: Threshold above which we say pixel belongs to a character
 	:param affinity_threshold: Threshold above which we say a pixel belongs to a affinity
+	:param word_threshold: Threshold above which we say a group of characters compromise a word
 	:return: word_bbox
 	"""
 
@@ -305,10 +346,8 @@ def generate_word_bbox_batch(batch_character_heatmap, batch_affinity_heatmap, ch
 			batch_character_heatmap[i],
 			batch_affinity_heatmap[i],
 			character_threshold,
-			affinity_threshold)
-
-		if 'error_message' in returned.keys():
-			word_bbox.append(np.zeros([0]))
+			affinity_threshold,
+			word_threshold)
 
 		word_bbox.append(returned['word_bbox'])
 
@@ -442,66 +481,3 @@ def get_smooth_polygon(word_contours):
 		convex_hull = np.repeat(convex_hull, 2, axis=0)
 
 	return convex_hull
-
-
-def join(characters, joints, return_characters=False):
-
-	# ToDo Change this function to be exactly like it is in the CRAFT paper
-
-	"""
-	Function to create word-polygon from character-bbox and affinity-bbox.
-	A graph is created in which all the character-bbox and affinity-bbox are treated as nodes and there is an edge
-	between them if IOU of the contours > 0. Then connected components are found and a convex hull is taken over all
-	the nodes(char-bbox and affinity-bbox) compromising the word-polygon. This way the word-polygon is found
-
-	:param characters: type=np.array, dtype=np.int64, shape=[num_chars, 4, 1, 2]
-	:param joints: type=np.array, dtype=np.int64, shape=[num_affinity, 4, 1, 2]
-	:param return_characters: a bool to toggle returning of character bbox corresponding to each word-polygon
-	:return:
-		all_word_contours: type = np.array, dtype=np.int64, shape=[num_words, 4, 1, 2]
-		all_character_contours: type = list of np.array, dtype=np.int64, shape =[num_words, num_chars, 4, 1, 2]
-		all_affinity_contours: type = list of np.array, dtype=np.int64, shape =[num_words, num_chars, 4, 1, 2]
-	"""
-
-	all_joined = np.concatenate([characters, joints], axis=0)
-
-	graph = nx.Graph()
-	graph.add_nodes_from(nx.path_graph(all_joined.shape[0]))
-
-	for contour_i in range(all_joined.shape[0]-1):
-		for contour_j in range(contour_i+1, all_joined.shape[0]):
-			if Polygon(all_joined[contour_i, :, 0, :]).intersection(Polygon(all_joined[contour_j, :, 0, :])).area > 0:
-				graph.add_edge(contour_i, contour_j)
-
-	all_words = nx.connected_components(graph)
-
-	all_word_contours = []
-	all_character_contours = []
-	all_affinity_contours = []
-
-	for word_idx in all_words:
-
-		index_chars = np.array(list(word_idx))[list(np.where(np.array(list(word_idx)) < len(characters)))[0]]
-
-		if len(index_chars) == 0:
-			continue
-
-		index_affinity = np.array(list(word_idx))[list(np.where(np.array(list(word_idx)) >= len(characters)))[0]]
-
-		# Converting the characters and affinity to a polygon and then converting it to rectangle.
-		# In the future can be changed to produce polygon outputs
-		all_word_contours.append(poly_to_rect(get_smooth_polygon(all_joined[list(word_idx)])))
-
-		all_character_contours.append(all_joined[index_chars])
-
-		if len(index_affinity) != 0:
-			all_affinity_contours.append(all_joined[index_affinity])
-		else:
-			all_affinity_contours.append(np.zeros([0, 4, 1, 2]))
-
-	all_word_contours = np.array(all_word_contours, dtype=np.int64).reshape([len(all_word_contours), 4, 1, 2])
-
-	if return_characters:
-		return all_word_contours, all_character_contours, all_affinity_contours
-	else:
-		return all_word_contours
