@@ -23,7 +23,7 @@ DataLoaderICDAR2013_Synthesis = '/home/SharedData/Mayank/ICDAR2015/Save/'
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2015'
 
 batch_size = {
-	'train': 3,
+	'train': 4,
 	'test': 3,
 }
 
@@ -52,6 +52,7 @@ lr = {
 
 threshold_character = 0.4
 threshold_affinity = 0.4
+threshold_word = 0.7
 threshold_fscore = 0.5
 
 iterations = batch_size['train']*500

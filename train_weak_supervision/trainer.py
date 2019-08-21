@@ -159,7 +159,8 @@ def train(model, optimizer, iteration):
 					character_bbox,
 					affinity_bbox,
 					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity)['word_bbox']
+					affinity_threshold=config.threshold_affinity,
+					word_threshold=config.threshold_word)['word_bbox']
 
 				predicted_ic13.append(predicted_bbox)
 				target_bbox.append(np.array(ground_truth[_[0] % len(ground_truth)][1]['word_bbox'], dtype=np.int64))
@@ -263,7 +264,8 @@ def test(model):
 				generated_targets = generate_word_bbox(
 					character_bbox, affinity_bbox,
 					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity)
+					affinity_threshold=config.threshold_affinity,
+					word_threshold=config.threshold_word)
 
 				predicted_word_bbox = generated_targets['word_bbox'].copy()
 

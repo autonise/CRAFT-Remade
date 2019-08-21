@@ -25,6 +25,25 @@ for i_ in range(int(extent*mult)):
 gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
 
 
+def normalize_mean_variance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
+	# should be RGB order
+	img = in_img.copy().astype(np.float32)
+
+	img -= np.array([mean[0] * 255.0, mean[1] * 255.0, mean[2] * 255.0], dtype=np.float32)
+	img /= np.array([variance[0] * 255.0, variance[1] * 255.0, variance[2] * 255.0], dtype=np.float32)
+	return img
+
+
+def denormalize_mean_variance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
+	# should be RGB order
+	img = in_img.copy()
+	img *= variance
+	img += mean
+	img *= 255.0
+	img = np.clip(img, 0, 255).astype(np.uint8)
+	return img
+
+
 def order_points(pts):
 
 	"""
@@ -472,7 +491,7 @@ class DataLoaderSYNTH(data.Dataset):
 
 		image = plt.imread(self.base_path+'/'+self.imnames[item][0])  # Read the image
 		image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
-		image = image.transpose(2, 0, 1)/255
+		image = normalize_mean_variance(image).transpose(2, 0, 1)
 		weight = generate_target(image.shape, character.copy())  # Generate character heatmap
 		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())  # Generate affinity heatmap
 
@@ -509,7 +528,8 @@ class DataLoaderEval(data.Dataset):
 		big_image[
 			(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
 			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
-		big_image = big_image.astype(np.uint8).transpose(2, 0, 1)/255
+		big_image = normalize_mean_variance(big_image)
+		big_image = big_image.transpose(2, 0, 1)
 
 		return big_image.astype(np.float32), self.imnames[item], np.array([height, width])
 

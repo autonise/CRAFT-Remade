@@ -8,7 +8,7 @@ save_path = '/home/SharedData/Mayank/Models/SYNTH'
 use_cuda = False
 
 batch_size = {
-	'train': 3,
+	'train': 4,
 	'test': 3,
 }
 
@@ -18,18 +18,19 @@ pretrained_loss_plot_training = 'model/loss_plot_training.npy'
 
 lr = {
 	1: 5e-5,
-	10000: 2.5e-5,
-	20000: 1e-5,
-	40000: 5e-6,
-	60000: 1e-6,
+	30000: 2.5e-5,
+	60000: 1e-5,
+	120000: 5e-6,
+	180000: 1e-6,
 }
 
-periodic_fscore = 100
-periodic_output = 1000
-periodic_save = 10000
+periodic_fscore = 300
+periodic_output = 3000
+periodic_save = 30000
 
 threshold_character = 0.4
 threshold_affinity = 0.4
+threshold_word = 0.7
 threshold_fscore = 0.5
 
 DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
@@ -38,7 +39,7 @@ DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_sy
 
 ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2015'
 
-visualize_generated = True
+visualize_generated = False
 
 
 def get_weight_threshold(min_, max_, iteration):
@@ -51,4 +52,6 @@ def get_weight_threshold(min_, max_, iteration):
 	return np.flip(np.array(weight_threshold_))
 
 
-weight_threshold = get_weight_threshold(0.85, 1, 20)
+weight_threshold = get_weight_threshold(0.5, 0.5, 20)
+
+model_architecture = 'craft'

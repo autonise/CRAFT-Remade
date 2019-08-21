@@ -1,4 +1,4 @@
-from src.model import UNetWithResnet50Encoder, Criterian
+from src.generic_model import Criterian
 from .dataloader import DataLoaderSYNTH
 from torch.utils.data import DataLoader
 import torch
@@ -113,13 +113,15 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 			image, weight, weight_affinity = image.cuda(), weight.cuda(), weight_affinity.cuda()
 
 		output = model(image)
-		loss = loss_criterian(output, weight, weight_affinity).mean()
+		loss = loss_criterian(output, weight, weight_affinity).mean()/4
 
-		all_loss.append(loss.item())
+		all_loss.append(loss.item()*4)
 
 		loss.backward()
-		optimizer.step()
-		optimizer.zero_grad()
+
+		if (no + 1) % 4 == 0:
+			optimizer.step()
+			optimizer.zero_grad()
 
 		if len(all_accuracy) == 0:
 			iterator.set_description(
@@ -136,7 +138,7 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 				'| Average F-Score: ' + str(int(np.array(all_accuracy)[-min(1000, len(all_accuracy)):].mean()*100000000)/100000000)
 			)
 
-		if no >= 1000:
+		if no >= 3000:
 
 			# Calculating the f-score after some iterations because initially there are a lot of stray contours
 
@@ -149,13 +151,17 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 					output[:, 0, :, :].data.cpu().numpy(),
 					output[:, 1, :, :].data.cpu().numpy(),
 					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity)
+					affinity_threshold=config.threshold_affinity,
+					word_threshold=config.threshold_word,
+				)
 
 				target_bbox = generate_word_bbox_batch(
 					weight.data.cpu().numpy(),
 					weight_affinity.data.cpu().numpy(),
 					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity)
+					affinity_threshold=config.threshold_affinity,
+					word_threshold=config.threshold_word,
+				)
 
 				all_accuracy.append(calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore))
 
@@ -199,7 +205,12 @@ def main():
 
 	copyfile('train_synth/config.py', config.save_path + '/config.py')
 
-	model = UNetWithResnet50Encoder()
+	if config.model_architecture == 'UNET_ResNet':
+		from src.UNET_ResNet import UNetWithResnet50Encoder
+		model = UNetWithResnet50Encoder()
+	else:
+		from src.craft_model import CRAFT
+		model = CRAFT()
 
 	model_parameters = filter(lambda p: p.requires_grad, model.parameters())
 	params = sum([np.prod(p.size()) for p in model_parameters])
@@ -216,7 +227,7 @@ def main():
 
 	train_dataloader = DataLoader(
 		train_dataloader, batch_size=config.batch_size['train'],
-		shuffle=True, num_workers=24)
+		shuffle=True, num_workers=10)
 
 	optimizer = torch.optim.Adam(model.parameters(), lr=config.lr[1])
 
