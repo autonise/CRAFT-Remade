@@ -15,9 +15,15 @@ def hard_negative_mining(pred, target, weight=None):
     """
 
     cpu_target = target.data.cpu().numpy()
+
     all_loss = F.mse_loss(pred, target, reduction='none')
 
-    positive = np.where(cpu_target != 0)[0]
+    if weight is not None:
+        cpu_weight = weight.data.cpu().numpy()
+        positive = np.where(np.logical_and(cpu_target != 0, cpu_weight != 0))[0]
+    else:
+        positive = np.where(cpu_target != 0)[0]
+
     negative = np.where(cpu_target == 0)[0]
 
     if weight is not None:

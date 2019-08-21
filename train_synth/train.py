@@ -1,5 +1,5 @@
 from src.generic_model import Criterian
-from .dataloader import DataLoaderSYNTH
+from .dataloader import DataLoaderSYNTH, denormalize_mean_variance
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
@@ -47,7 +47,7 @@ def save(data, output, target, target_affinity, epoch, no):
 		character_bbox = output[i, 0, :, :]
 		affinity_bbox = output[i, 1, :, :]
 
-		plt.imsave(base+str(i) + '/image.png', data[i].transpose(1, 2, 0))
+		plt.imsave(base+str(i) + '/image.png', denormalize_mean_variance(data[i].transpose(1, 2, 0)))
 
 		plt.imsave(base+str(i) + '/target_characters.png', target[i, :, :], cmap='gray')
 		plt.imsave(base+str(i) + '/target_affinity.png', target_affinity[i, :, :], cmap='gray')
