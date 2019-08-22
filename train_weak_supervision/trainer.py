@@ -3,6 +3,7 @@ import train_weak_supervision.config as config
 from src.generic_model import Criterian
 from src.utils.parallel import DataParallelCriterion
 from src.utils.utils import calculate_batch_fscore, generate_word_bbox, calculate_fscore
+from train_synth.dataloader import denormalize_mean_variance
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -171,7 +172,8 @@ def train(model, optimizer, iteration):
 			calculate_batch_fscore(
 				predicted_ic13,
 				target_bbox,
-				threshold=config.threshold_fscore)*current_count)
+				threshold=config.threshold_fscore)*current_count
+		)
 
 		all_count.append(current_count)
 

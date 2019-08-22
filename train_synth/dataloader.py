@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import os
 import train_synth.config as config
+from shapely.geometry import Polygon
 
 """
 	globally generating gaussian heatmap which will be warped for every character bbox
@@ -164,7 +165,14 @@ def add_character(image, bbox):
 		:return: image in which the gaussian character bbox has been added
 	"""
 
+	if not Polygon(bbox.reshape([4, 2]).astype(np.int32)).is_valid:
+		return image
+
 	top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
+	top_right = np.array([np.max(bbox[:, 0]), np.max(bbox[:, 1])]).astype(np.int32)
+
+	if top_right[1] < 0 or top_right[0] < 0:
+		return image
 	if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
 		return image
 	bbox -= top_left[None, :]
@@ -174,6 +182,7 @@ def add_character(image, bbox):
 	start_col = max(top_left[0], 0) - top_left[0]
 	end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
 	end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
+
 	image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
 		transformed[
 		start_row:end_row - top_left[1],
@@ -192,6 +201,9 @@ def add_character_others(image, weight_map, weight_val, bbox):
 		:return:    image in which the gaussian character bbox has been added,
 					weight_map in which the weight as per weak-supervision has been calculated
 	"""
+
+	if not Polygon(bbox.reshape([4, 2]).astype(np.int32)).is_valid:
+		return image
 
 	top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
 	if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
@@ -226,6 +238,10 @@ def add_affinity(image, bbox_1, bbox_2):
 		:return: image in which the gaussian affinity bbox has been added
 	"""
 
+	if (not Polygon(bbox_1.reshape([4, 2]).astype(np.int32)).is_valid) or (
+			not Polygon(bbox_2.reshape([4, 2]).astype(np.int32)).is_valid):
+		return image
+
 	bbox_1 = order_points(bbox_1)
 	bbox_2 = order_points(bbox_2)
 
@@ -248,6 +264,10 @@ def two_char_bbox_to_affinity(bbox_1, bbox_2):
 	:param bbox_2: type=np.array, dtype=np.int64, shape = [4, 1, 2]
 	:return: affinity bbox, type=np.array, dtype=np.int64, shape = [4, 1, 2]
 	"""
+
+	if (not Polygon(bbox_1.reshape([4, 2]).astype(np.int32)).is_valid) or (
+			not Polygon(bbox_2.reshape([4, 2]).astype(np.int32)).is_valid):
+		return np.zeros([4, 1, 2], dtype=np.int32)
 
 	bbox_1 = bbox_1[:, 0, :].copy()
 	bbox_2 = bbox_2[:, 0, :].copy()
@@ -278,17 +298,10 @@ def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 
 	bbox_1 = order_points(bbox_1)
 	bbox_2 = order_points(bbox_2)
-	backup = image.copy(), weight.copy()
 
-	try:
+	affinity = two_char_bbox_to_affinity(bbox_1, bbox_2)
 
-		affinity = two_char_bbox_to_affinity(bbox_1, bbox_2)
-
-		return add_character_others(image, weight, weight_val, affinity)
-
-	except:
-
-		return backup
+	return add_character_others(image, weight, weight_val, affinity)
 
 
 def generate_target(image_size, character_bbox, weight=None):
@@ -494,7 +507,6 @@ class DataLoaderSYNTH(data.Dataset):
 		image = normalize_mean_variance(image).transpose(2, 0, 1)
 		weight = generate_target(image.shape, character.copy())  # Generate character heatmap
 		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())  # Generate affinity heatmap
-
 		return image.astype(np.float32), weight.astype(np.float32), weight_affinity.astype(np.float32)
 
 	def __len__(self):
