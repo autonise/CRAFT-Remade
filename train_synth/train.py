@@ -96,9 +96,6 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 
 	for no, (image, weight, weight_affinity) in enumerate(iterator):
 
-		if no < starting_no:
-			continue
-
 		if epoch == 0:
 			change_lr(no)
 
@@ -125,14 +122,14 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 
 		if len(all_accuracy) == 0:
 			iterator.set_description(
-				'Loss:' + str(int(loss.item() * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
+				'Loss:' + str(int(loss.item() * 4 * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
 					len(iterator)) +
 				'] Average Loss:' + str(int(np.array(all_loss)[-min(1000, len(all_loss)):].mean() * 100000000) / 100000000))
 
 		else:
 
 			iterator.set_description(
-				'Loss:' + str(int(loss.item() * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
+				'Loss:' + str(int(loss.item() * 4 * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
 					len(iterator)) +
 				'] Average Loss:' + str(int(np.array(all_loss)[-min(1000, len(all_loss)):].mean()*100000000)/100000000) +
 				'| Average F-Score: ' + str(int(np.array(all_accuracy)[-min(1000, len(all_accuracy)):].mean()*100000000)/100000000)
@@ -227,7 +224,7 @@ def main():
 
 	train_dataloader = DataLoader(
 		train_dataloader, batch_size=config.batch_size['train'],
-		shuffle=True, num_workers=10)
+		shuffle=True, num_workers=12)
 
 	optimizer = torch.optim.Adam(model.parameters(), lr=config.lr[1])
 

@@ -88,7 +88,10 @@ class DataLoaderMIX(data.Dataset):
 
 	def __getitem__(self, item_i):
 
-		if np.random.uniform() < config.prob_synth and self.type_ == 'train':
+		np.random.seed()
+		check = np.random.uniform()
+
+		if check < config.prob_synth and self.type_ == 'train':
 			# probability of picking a Synth-Text image vs Image from dataset
 
 			random_item = np.random.randint(len(self.imnames))
