@@ -1,48 +1,46 @@
 """
 Config containing all hardcoded parameters for training strong supervised model on synth-text
 """
+from config import *
 
-num_cuda = "0"
-seed = 0
+num_cuda = "0,1,2,3"
 save_path = '/home/SharedData/Mayank/Models/SYNTH'
-use_cuda = False
+use_cuda = True
 
 batch_size = {
-	'train': 4,
+	'train': 4*len(num_cuda.split(',')),
 	'test': 3,
 }
 
+num_workers = {
+	'train': 8,
+	'test': 8
+}
+
 pretrained = False
-pretrained_path = ''
-pretrained_loss_plot_training = 'model/loss_plot_training.npy'
+pretrained_path = '/home/SharedData/Mayank/Models/SYNTH/63000_model.pkl'
+pretrained_loss_plot_training = '/home/SharedData/Mayank/Models/SYNTH/loss_plot_training.npy'
 
 lr = {
-	1: 5e-5,
-	30000: 2.5e-5,
-	60000: 1e-5,
-	120000: 5e-6,
-	180000: 1e-6,
+	1: 1e-4,
+	10000: 5e-5,
+	20000: 2e-5,
+	40000: 1e-5,
+	60000: 1e-6,
 }
+
+num_epochs_strong_supervision = 2
 
 periodic_fscore = 300
 periodic_output = 3000
-periodic_save = 30000
-
-threshold_character = 0.4
-threshold_affinity = 0.4
-threshold_word = 0.7
-threshold_fscore = 0.5
-
-DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
-DataLoaderSYNTH_mat = '/home/SharedData/Mayank/SynthText/gt.mat'
-DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'
-
-ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2015'
+periodic_save = 3000
+optimizer_iteration = 1
 
 visualize_generated = False
 
 
 def get_weight_threshold(min_, max_, iteration):
+
 	import numpy as np
 	weight_threshold_ = []
 	for i in range(iteration-1):
@@ -55,3 +53,5 @@ def get_weight_threshold(min_, max_, iteration):
 weight_threshold = get_weight_threshold(0.5, 0.5, 20)
 
 model_architecture = 'craft'
+
+image_size = [1024, 1024]

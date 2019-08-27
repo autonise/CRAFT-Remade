@@ -50,10 +50,80 @@ SynthText - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<b
 - [ ] Total Text - yet_to_be_completed
 - [ ] MS-COCO - yet_to_be_completed
     
-## How to train on your own dataset
+## How to train the model from scratch
+
+### Strong Supervision on Synthetic dataset
 
 Download the pre-trained model on Synthetic dataset at https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T
-<br> Make your own custom dataloader as in train_weak_supervision/dataloader.DataLoaderMIX
+<br> Otherwise if you want to train from scratch
 <br> Run the command - 
     
-    python main.py weak_supervision --model=/path/to/pre-trained/Synth-Text-Model --iterations=epochs-of-weak-supervision
+    python main.py train_synth --mode train
+    
+<br> To test your model on SynthText, Run the command -
+    
+    python main.py train_synth --mode test --model /path/to/model
+    
+### Weak Supervision
+
+#### First Pre-Process your dataset
+
+*Currently Supported - [IC13, IC15]
+
+The assumed structure of the dataset is
+
+    .
+    ├── Generated (This folder will contain the weak-supervision intermediate targets)
+    └── Images
+        ├── test
+        │   ├── img_1.jpg
+        │   ├── img_2.jpg
+        │   ├── img_3.jpg
+        │   ├── img_4.jpg
+        │   └── img_5.jpg
+        │   └── ...
+        ├── test_gt.json (This can be generated using the pre_process function described below)
+        ├── train
+        │   ├── img_1.jpg
+        │   ├── img_2.jpg
+        │   ├── img_3.jpg
+        │   ├── img_4.jpg
+        │   └── img_5.jpg
+        │   └── ...
+        └── train_gt.json (This can be generated using the pre_process function described below)
+
+To generate the json files for IC13 - 
+
+    In config.py change the corresponding values
+    
+    'ic13': {
+		'train': {
+			'target_json_path': None,  --> path to where you want the target json file (Images/train_gt.json)
+			'target_folder_path': None,  --> path to where you downloaded the train gt (ch2_training_localization_transcription_gt)
+		},
+		'test': {
+			'target_json_path': None,  --> path to where you want the target json file (Images/test_gt.json)
+			'target_folder_path': None,  --> path to where you downloaded the train gt (Challenge2_Test_Task1_GT)
+		}
+		
+To generate the json files for IC15 - 
+
+    In config.py change the corresponding values
+    
+    'ic15': {
+		'train': {
+			'target_json_path': None,  --> path to where you want the target json file (Images/train_gt.json)
+			'target_folder_path': None,  --> path to where you downloaded the train gt (ch4_training_localization_transcription_gt)
+		},
+		'test': {
+			'target_json_path': None,  --> path to where you want the target json file (Images/test_gt.json)
+			'target_folder_path': None,  --> path to where you downloaded the train gt (Challenge4_Test_Task1_GT)
+		}
+
+#### Second Train your model based on weak-supervision
+
+<br> Run the command - 
+
+    python main.py weak_supervision --model /path/to/strong/supervision/model --iterations <num_of_iterations(20)>
+    
+This will train the weak supervision model for the number of iterations you specified

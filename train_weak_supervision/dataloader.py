@@ -6,8 +6,8 @@ import os
 import json
 
 import train_weak_supervision.config as config
-from train_synth.dataloader import resize, resize_generated, normalize_mean_variance
-from train_synth.dataloader import generate_affinity, generate_target, generate_target_others
+from src.utils.data_manipulation import resize, resize_generated, normalize_mean_variance
+from src.utils.data_manipulation import generate_affinity, generate_target, generate_target_others
 
 
 DEBUG = False
@@ -23,8 +23,8 @@ class DataLoaderMIX(data.Dataset):
 
 		self.type_ = type_
 		self.base_path_synth = config.DataLoaderSYNTH_base_path
-		self.base_path_other_images = config.ICDAR2013_path+'/Images/'+type_
-		self.base_path_other_gt = config.ICDAR2013_path+'/Generated/'+str(iteration)
+		self.base_path_other_images = config.Other_Dataset_Path + '/Images/' + type_
+		self.base_path_other_gt = config.Other_Dataset_Path + '/Generated/' + str(iteration)
 
 		if config.prob_synth != 0:
 
@@ -88,6 +88,7 @@ class DataLoaderMIX(data.Dataset):
 
 	def __getitem__(self, item_i):
 
+		# noinspection PyArgumentList
 		np.random.seed()
 		check = np.random.uniform()
 
@@ -96,9 +97,11 @@ class DataLoaderMIX(data.Dataset):
 
 			random_item = np.random.randint(len(self.imnames))
 
+			character = self.charBB[random_item].copy()
+
 			image = plt.imread(self.base_path_synth+'/'+self.imnames[random_item][0])  # Read the image
 			height, width, channel = image.shape
-			image, character = resize(image, self.charBB[random_item].copy())  # Resize the image to (768, 768)
+			image, character = resize(image, character)  # Resize the image to (768, 768)
 			image = normalize_mean_variance(image).transpose(2, 0, 1)
 
 			# Generate character heatmap with weights
@@ -110,7 +113,8 @@ class DataLoaderMIX(data.Dataset):
 				self.txt[random_item].copy(),
 				weight=1)
 
-			word_bbox = np.array([random_item, -1])
+			dataset_name = 'SYNTH'
+			text_target = ''
 
 		else:
 
@@ -128,6 +132,7 @@ class DataLoaderMIX(data.Dataset):
 			image, character, affinity = resize_generated(image, character.copy(), affinity.copy())
 			image = normalize_mean_variance(image).transpose(2, 0, 1)
 			weights = [i for i in self.gt[random_item][1]['weights'].copy()]
+			text_target = '~'.join(self.gt[random_item][1]['text'].copy())
 
 			# Generate character heatmap with weights
 			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights.copy())
@@ -136,7 +141,7 @@ class DataLoaderMIX(data.Dataset):
 			weight_affinity, weak_supervision_affinity = generate_target_others(image.shape, affinity.copy(), weights.copy())
 
 			# Get original word_bbox annotations
-			word_bbox = np.array([random_item, 1])
+			dataset_name = 'ICDAR'
 
 		return \
 			image.astype(np.float32), \
@@ -144,7 +149,9 @@ class DataLoaderMIX(data.Dataset):
 			weight_affinity.astype(np.float32), \
 			weak_supervision_char.astype(np.float32), \
 			weak_supervision_affinity.astype(np.float32), \
-			word_bbox, \
+			dataset_name, \
+			text_target, \
+			random_item, \
 			np.array([height, width])
 
 	def __len__(self):
@@ -166,8 +173,8 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 	def __init__(self, type_):
 
 		self.type_ = type_
-		self.base_path = config.ICDAR2013_path+'/Images/'
-		with open(self.base_path+self.type_+'_gt.json', 'r') as f:
+		self.base_path = config.Other_Dataset_Path + '/Images/'
+		with open(self.base_path + self.type_ + '_gt.json', 'r') as f:
 			self.gt = json.load(f)
 
 		self.imnames = sorted(self.gt['annots'].keys())
@@ -192,8 +199,7 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 		big_image[
 			(768 - image.shape[0]) // 2: (768 - image.shape[0]) // 2 + image.shape[0],
 			(768 - image.shape[1]) // 2: (768 - image.shape[1]) // 2 + image.shape[1]] = image
-		big_image = normalize_mean_variance(big_image)
-		big_image = big_image.transpose(2, 0, 1)
+		big_image = normalize_mean_variance(big_image).transpose(2, 0, 1)
 
 		return big_image.astype(np.float32), self.imnames[item], np.array([height, width]), item
 

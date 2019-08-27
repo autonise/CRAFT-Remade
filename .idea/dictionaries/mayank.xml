@@ -3,6 +3,8 @@
     <words>
       <w>annot</w>
       <w>annots</w>
+      <w>basenet</w>
+      <w>bicubic</w>
       <w>bilinear</w>
       <w>cmap</w>
       <w>conv</w>
@@ -27,6 +29,7 @@
       <w>pred</w>
       <w>pretrained</w>
       <w>pytorch</w>
+      <w>relu</w>
       <w>resnet</w>
       <w>scipy</w>
       <w>synth</w>
@@ -35,6 +38,7 @@
       <w>tqdm</w>
       <w>uint</w>
       <w>unet</w>
+      <w>upconv</w>
       <w>upsample</w>
       <w>upsampling</w>
     </words>

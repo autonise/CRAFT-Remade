@@ -7,8 +7,7 @@ import sys
 """
 
 if __name__ == "__main__":
-	
-	
+
 	if len(sys.argv) != 3:
 		print('Usage: python running_mean path_to_loss.npy path_to_moving_average.png')
 		exit(0)
