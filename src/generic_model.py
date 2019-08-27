@@ -2,6 +2,8 @@ import numpy as np
 from torch.nn import functional as F
 from torch import nn
 
+THRESHOLD_POSITIVE = 0.1
+
 
 def hard_negative_mining(pred, target, weight=None):
 
@@ -20,11 +22,11 @@ def hard_negative_mining(pred, target, weight=None):
 
     if weight is not None:
         cpu_weight = weight.data.cpu().numpy()
-        positive = np.where(np.logical_and(cpu_target != 0, cpu_weight != 0))[0]
+        positive = np.where(np.logical_and(cpu_target >= THRESHOLD_POSITIVE, cpu_weight != 0))[0]
     else:
-        positive = np.where(cpu_target != 0)[0]
+        positive = np.where(cpu_target >= THRESHOLD_POSITIVE)[0]
 
-    negative = np.where(cpu_target == 0)[0]
+    negative = np.where(cpu_target < THRESHOLD_POSITIVE)[0]
 
     if weight is not None:
         positive_loss = all_loss[positive]*weight[positive]

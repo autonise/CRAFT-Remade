@@ -1,37 +1,33 @@
 """
 Config containing all hardcoded parameters for training weak supervised model on datasets like icdar 2013
 """
+from config import *
 
 seed = 0
 
 use_cuda = True
-num_cuda = "0"
+num_cuda = "0,1,2,3"
 
-save_path = '/home/SharedData/Mayank/Models/WeakSupervision/ICDAR2015'
+prob_synth = 0
 
-images_path = '/home/SharedData/Mayank/ICDAR2015/Images'
-target_path = '/home/SharedData/Mayank/ICDAR2015/Generated'
-
-prob_synth = 1/3
-
-DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
-DataLoaderSYNTH_mat = '/home/SharedData/Mayank/SynthText/gt.mat'
-DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'
-
-DataLoaderICDAR2013_Synthesis = '/home/SharedData/Mayank/ICDAR2015/Save/'
-
-ICDAR2013_path = '/home/SharedData/Mayank/ICDAR2015'
+check_path = 'Temporary/'
 
 batch_size = {
 	'train': 4,
 	'test': 3,
 }
 
+num_workers = {
+	'train': 8,
+	'test': 8
+}
+
+
 lr = {
-	0: 5e-6,
+	0: 1e-4,
 	1: 1e-4,
 	2: 1e-4,
-	3: 1e-4,
+	3: 1e-5,
 	4: 5e-5,
 	5: 5e-5,
 	6: 5e-5,
@@ -50,11 +46,13 @@ lr = {
 	19: 1e-6,
 }
 
-threshold_character = 0.4
-threshold_affinity = 0.4
-threshold_word = 0.7
-threshold_fscore = 0.5
-
-iterations = batch_size['train']*5000
+optimizer_iterations = 4
+iterations = batch_size['train']*2500*optimizer_iterations
+check_iterations = 200
 
 model_architecture = 'craft'
+
+data_augmentation = {
+	'crop_size': [[1024, 1024], [768, 768], [512, 512]],
+	'crop_size_prob': [0.7, 0.2, 0.1],
+}

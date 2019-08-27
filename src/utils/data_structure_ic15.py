@@ -3,19 +3,15 @@ import numpy as np
 import json
 
 
-def icdar2015_test():
+def icdar2015_test(base_path='Challenge4_Test_Task1_GT', output_path='Images/test_gt.json'):
 	"""
 	This function converts the icdar 2013 challenge 2 images to the format which we need
 	to train our weak supervision model.
 	More data set conversion functions would be written here
+	:param base_path: Put your path to ground truth folder for icdar 2015 data set
+	:param output_path: Will convert the ground truth to a json format at the location output_path
 	:return: None
 	"""
-
-	# Put your path to ground truth folder for icdar 2013 data set
-	base_path = 'Challenge4_Test_Task1_GT'
-
-	# Will convert the ground truth to a json format at the location output_path
-	output_path = 'Images/test_gt.json'
 
 	all_transcriptions = os.listdir(base_path)
 
@@ -61,19 +57,15 @@ def icdar2015_test():
 		json.dump(all_annots, f)
 
 
-def icdar2015_train():
+def icdar2015_train(base_path='ch4_training_localization_transcription_gt', output_path='Images/train_gt.json'):
 	"""
 	This function converts the icdar 2013 challenge 2 images to the format which we need
 	to train our weak supervision model.
 	More data set conversion functions would be written here
+	:param base_path: Put your path to ground truth folder for icdar 2015 data set
+	:param output_path: Will convert the ground truth to a json format at the location output_path
 	:return: None
 	"""
-
-	# Put your path to ground truth folder for icdar 2013 data set
-	base_path = 'ch4_training_localization_transcription_gt'
-
-	# Will convert the ground truth to a json format at the location output_path
-	output_path = 'Images/train_gt.json'
 
 	all_transcriptions = os.listdir(base_path)
 
@@ -120,10 +112,3 @@ def icdar2015_train():
 
 	with open(output_path, 'w') as f:
 		json.dump(all_annots, f)
-
-
-if __name__ == "__main__":
-
-	# Currently only one dataset supported
-	icdar2015_test()
-	icdar2015_train()

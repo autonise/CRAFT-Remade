@@ -2,8 +2,8 @@ from train_weak_supervision.dataloader import DataLoaderMIX, DataLoaderEvalICDAR
 import train_weak_supervision.config as config
 from src.generic_model import Criterian
 from src.utils.parallel import DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, generate_word_bbox, calculate_fscore
-from train_synth.dataloader import denormalize_mean_variance
+from src.utils.utils import calculate_batch_fscore, calculate_fscore, resize_bbox
+from src.utils.data_manipulation import denormalize_mean_variance
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -11,58 +11,43 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import os
-import cv2
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
 
-def save(data, output, target, target_affinity, epoch, no):
+def save(no, dataset_name, output, image, character_map, affinity_map, character_weight, affinity_weight):
 
-	"""
-	Saving the synthesised outputs in between the training
-	:param data: image as tensor
-	:param output: predicted output from the model as tensor
-	:param target: character heatmap target as tensor
-	:param target_affinity: affinity heatmap target as tensor
-	:param no: current iteration number
-	:param epoch: current epoch
-	:return: None
-	"""
+	os.makedirs('Temporary/' + str(no), exist_ok=True)
 
-	output = output.data.cpu().numpy()
-	data = data.data.cpu().numpy()
-	target = target.data.cpu().numpy()
-	target_affinity = target_affinity.data.cpu().numpy()
+	for __, _ in enumerate(dataset_name):
 
-	batch_size = output.shape[0]
+		os.makedirs('Temporary/'+str(no)+'/'+str(__), exist_ok=True)
 
-	base = config.DataLoaderICDAR2013_Synthesis + str(epoch) + '_' + str(no) + '/'
-
-	os.makedirs(base, exist_ok=True)
-
-	for i in range(batch_size):
-
-		os.makedirs(base+str(i), exist_ok=True)
-		character_bbox = output[i, 0, :, :]
-		affinity_bbox = output[i, 1, :, :]
-
-		plt.imsave(base+str(i) + '/image.png', data[i].transpose(1, 2, 0))
-
-		plt.imsave(base+str(i) + '/target_characters.png', target[i, :, :], cmap='gray')
-		plt.imsave(base+str(i) + '/target_affinity.png', target_affinity[i, :, :], cmap='gray')
-
-		plt.imsave(base + str(i) + '/pred_characters.png', character_bbox, cmap='gray')
-		plt.imsave(base + str(i) + '/pred_affinity.png', affinity_bbox, cmap='gray')
-
-		# Thresholding the character and affinity heatmap
+		plt.imsave('Temporary/'+str(no)+'/'+str(__)+'/image_.png', denormalize_mean_variance(
+			image[__].data.cpu().numpy().transpose(1, 2, 0)))
 
 		plt.imsave(
-			base + str(i) + '/pred_characters_thresh.png',
-			np.float32(character_bbox > config.threshold_character),
+			'Temporary/'+str(no)+'/'+str(__)+'/char_map.png', output[__, 0].data.cpu().numpy(),
 			cmap='gray')
+
 		plt.imsave(
-			base + str(i) + '/pred_affinity_thresh.png',
-			np.float32(affinity_bbox > config.threshold_affinity),
+			'Temporary/'+str(no)+'/'+str(__)+'/aff_map.png', output[__, 1].data.cpu().numpy(),
+			cmap='gray')
+
+		plt.imsave(
+			'Temporary/'+str(no)+'/'+str(__)+'/target_char_map.png', character_map[__].data.cpu().numpy(),
+			cmap='gray')
+
+		plt.imsave(
+			'Temporary/'+str(no)+'/'+str(__)+'/target_affinity_map.png', affinity_map[__].data.cpu().numpy(),
+			cmap='gray')
+
+		plt.imsave(
+			'Temporary/'+str(no)+'/'+str(__)+'/weight_char_map.png', character_weight[__].data.cpu().numpy(),
+			cmap='gray')
+
+		plt.imsave(
+			'Temporary/'+str(no)+'/'+str(__)+'/weight_affinity_map.png', affinity_weight[__].data.cpu().numpy(),
 			cmap='gray')
 
 
@@ -87,7 +72,7 @@ def train(model, optimizer, iteration):
 	change_lr()
 
 	dataloader = DataLoader(
-		DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=8, shuffle=True)
+		DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=0, shuffle=True)
 	loss_criterian = DataParallelCriterion(Criterian())
 
 	model.train()
@@ -98,23 +83,35 @@ def train(model, optimizer, iteration):
 	all_accuracy = []
 	all_count = []
 
-	ground_truth = iterator.iterable.dataset.gt
-
-	for no, (image, character_map, affinity_map, character_weight, affinity_weight, word_bbox, original_dim) in \
-		enumerate(iterator):
+	for no, (
+			image,
+			character_map,
+			affinity_map,
+			character_weight,
+			affinity_weight,
+			dataset_name,
+			text_target,
+			item,
+			original_dim) in enumerate(iterator):
 
 		if config.use_cuda:
 			image, character_map, affinity_map = image.cuda(), character_map.cuda(), affinity_map.cuda()
 			character_weight, affinity_weight = character_weight.cuda(), affinity_weight.cuda()
 
 		output = model(image)
-		loss = loss_criterian(output, character_map, affinity_map, character_weight, affinity_weight).mean()/4
+		loss = loss_criterian(
+			output,
+			character_map,
+			affinity_map,
+			character_weight,
+			affinity_weight
+		).mean()/config.optimizer_iterations
 
-		all_loss.append(loss.item()*4)
+		all_loss.append(loss.item()*config.optimizer_iterations)
 
 		loss.backward()
 
-		if (no + 1) % 4 == 0:
+		if (no + 1) % config.optimizer_iterations == 0:
 			optimizer.step()
 			optimizer.zero_grad()
 
@@ -123,63 +120,47 @@ def train(model, optimizer, iteration):
 		if type(output) == list:
 			output = torch.cat(output, dim=0)
 
-		output = output.data.cpu().numpy()
-		# image = image.data.cpu().numpy()
-		original_dim = original_dim.cpu().numpy()
+		output[output < 0] = 0
+		output[output > 1] = 1
 
-		target_bbox = []
+		target_ic13 = []
 		predicted_ic13 = []
+		target_text = []
 		current_count = 0
 
-		word_bbox = word_bbox.numpy()
+		if no % config.check_iterations == 0:
 
-		for __, _ in enumerate(word_bbox):
+			save(no, dataset_name, output, image, character_map, affinity_map, character_weight, affinity_weight)
 
-			if _[1] == 1:
+		output = output.data.cpu().numpy()
+		original_dim = original_dim.numpy()
 
-				# ToDo - Understand why model.train() gives poor results but model.eval() with torch.no_grad() gives better results
+		for __, _ in enumerate(dataset_name):
 
-				max_dim = original_dim[__].max()
-				resizing_factor = 768 / max_dim
-				before_pad_dim = [int(original_dim[__][0] * resizing_factor), int(original_dim[__][1] * resizing_factor)]
+			if _ != 'SYNTH':
 
-				output[__, :, :, :] = np.uint8(output[__, :, :, :] * 255)
-
-				height_pad = (768 - before_pad_dim[0]) // 2
-				width_pad = (768 - before_pad_dim[1]) // 2
-
-				character_bbox = cv2.resize(
-					output[__, 0, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-					(original_dim[__][1], original_dim[__][0])) / 255
-
-				affinity_bbox = cv2.resize(
-					output[__, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-					(original_dim[__][1], original_dim[__][0])) / 255
-
-				predicted_bbox = generate_word_bbox(
-					character_bbox,
-					affinity_bbox,
-					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity,
-					word_threshold=config.threshold_word)['word_bbox']
-
-				predicted_ic13.append(predicted_bbox)
-				target_bbox.append(np.array(ground_truth[_[0] % len(ground_truth)][1]['word_bbox'], dtype=np.int64))
+				predicted_ic13.append(resize_bbox(original_dim[__], output[__], config)['word_bbox'])
+				target_ic13.append(np.array(dataloader.dataset.gt[item[__]][1]['word_bbox'].copy(), dtype=np.int32))
+				target_text.append(text_target[__].split('~'))
 
 				current_count += 1
 
-		all_accuracy.append(
-			calculate_batch_fscore(
-				predicted_ic13,
-				target_bbox,
-				threshold=config.threshold_fscore)*current_count
-		)
+		if len(predicted_ic13) != 0:
 
-		all_count.append(current_count)
+			all_accuracy.append(
+				calculate_batch_fscore(
+					predicted_ic13,
+					target_ic13,
+					text_target=target_text,
+					threshold=config.threshold_fscore)*current_count
+			)
+
+			all_count.append(current_count)
 
 		# ------------- Setting Description ---------------- #
 
 		if np.array(all_count)[-min(1000, len(all_count)):].sum() != 0:
+
 			f_score = int(
 						np.array(all_accuracy)[-min(1000, len(all_accuracy)):].sum() * 100000000 /
 						np.array(all_count)[-min(1000, len(all_count)):].sum()) / 100000000
@@ -187,14 +168,14 @@ def train(model, optimizer, iteration):
 			f_score = 0
 
 		iterator.set_description(
-			'Loss:' + str(int(loss.item() * 4 * 100000) / 100000) + ' Iterations:[' + str(no) + '/' + str(
-				len(iterator)) +
+			'Loss:' + str(int(loss.item() * config.optimizer_iterations * 100000) / 100000) + ' Iterations:[' + str(no)
+			+ '/' + str(len(iterator)) +
 			'] Average Loss:' + str(
 				int(np.array(all_loss)[-min(1000, len(all_loss)):].mean() * 100000) / 100000) +
 			'| Average F-Score: ' + str(f_score)
 		)
 
-	if len(iterator) % 4 != 0:
+	if len(iterator) % config.optimizer_iterations != 0:
 
 		optimizer.step()
 		optimizer.zero_grad()
@@ -246,32 +227,14 @@ def test(model):
 			for i in range(output.shape[0]):
 				# --------- Resizing it back to the original image size and saving it ----------- #
 
-				max_dim = original_dim[i].max()
-				resizing_factor = 768 / max_dim
-				before_pad_dim = [int(original_dim[i][0] * resizing_factor), int(original_dim[i][1] * resizing_factor)]
+				f_score.append(
+					calculate_fscore(
+						resize_bbox(original_dim[i], output[i], config)['word_bbox'][:, :, 0, :],
+						np.array(annots[i]['bbox']),
+						text_target=annots[i]['text'],
+					)
+				)
 
-				output[i, :, :, :] = np.uint8(output[i, :, :, :] * 255)
-
-				height_pad = (768 - before_pad_dim[0]) // 2
-				width_pad = (768 - before_pad_dim[1]) // 2
-
-				character_bbox = cv2.resize(
-					output[i, 0, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-					(original_dim[i][1], original_dim[i][0])) / 255
-
-				affinity_bbox = cv2.resize(
-					output[i, 1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-					(original_dim[i][1], original_dim[i][0])) / 255
-
-				generated_targets = generate_word_bbox(
-					character_bbox, affinity_bbox,
-					character_threshold=config.threshold_character,
-					affinity_threshold=config.threshold_affinity,
-					word_threshold=config.threshold_word)
-
-				predicted_word_bbox = generated_targets['word_bbox'].copy()
-
-				f_score.append(calculate_fscore(predicted_word_bbox[:, :, 0, :], np.array(annots[i]['bbox'])))
 				# --------------- PostProcessing for creating the targets for the next iteration ---------------- #
 
 			all_accuracy.append(np.mean(f_score))

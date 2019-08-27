@@ -158,3 +158,132 @@
 # 		return all_word_contours, all_character_contours, all_affinity_contours
 # 	else:
 # 		return all_word_contours
+#
+#
+#
+# def data_augmentation(
+# 		image,
+# 		weight_character,
+# 		weight_affinity,
+# 		weak_supervision_char=None,
+# 		weak_supervision_affinity=None,
+# 		crop_size=None,
+# 		):
+#
+# 	"""
+# 	This function will augment the dataset with:
+# 		1) Random Color Shift
+# 		2) Random Crop and Zoom
+#
+# 	:param image: np.array, dtype = np.float32, shape = [3, 768, 768]
+# 	:param weight_character: np.array, dtype = np.float32, shape = [768, 768]
+# 	:param weight_affinity: np.array, dtype = np.float32, shape = [768, 768]
+# 	:param weak_supervision_char: np.array, dtype = np.float32, shape = [768, 768]
+# 	:param weak_supervision_affinity: np.array, dtype = np.float32, shape = [768, 768]
+# 	:param crop_size: size to crop the image
+# 	:return:
+# 	"""
+#
+# 	image = random_color_shift(image)
+#
+# 	if crop_size is None:
+# 		crop_size = config.data_augmentation['crop_size_min']
+#
+# 	image, weight_character, weight_affinity, weak_supervision_char, weak_supervision_affinity = crop_zoom(
+# 		image,
+# 		weight_character,
+# 		weight_affinity,
+# 		weak_supervision_char,
+# 		weak_supervision_affinity,
+# 		crop_size,
+# 	)
+#
+# 	to_return = [image, weight_character, weight_affinity]
+#
+# 	if weak_supervision_char is not None:
+# 		to_return.append(weak_supervision_char)
+# 	if weak_supervision_affinity is not None:
+# 		to_return.append(weak_supervision_affinity)
+#
+# 	return to_return
+#
+#
+#
+# def random_color_shift(image):
+#
+# 	"""
+# 	This will randomly interchange the color of the image
+# 	:param image: np.array, dtype = np.float32, shape = [768, 768, 3]
+# 	:return: np.array, dtype = np.float32, shape = [768, 768, 3]
+# 	"""
+# 	# noinspection PyArgumentList
+# 	np.random.seed()
+# 	channel = np.array([0, 1, 2])
+# 	np.random.shuffle(channel)
+# 	return image[channel, :, :]
+#
+#
+# def crop_zoom(
+# 		image,
+# 		weight_character,
+# 		weight_affinity,
+# 		weak_supervision_char,
+# 		weak_supervision_affinity,
+# 		crop_size_min,
+# 		resize_shape):
+#
+# 	"""
+# 	This function will crop the image and resize it to the same size as it was originally
+#
+# 	:param image: np.array, dtype = np.float32, shape = [3, 768, 768]
+# 	:param weight_character: np.array, dtype = np.float32, shape = [768, 768]
+# 	:param weight_affinity: np.array, dtype = np.float32, shape = [768, 768]
+# 	:param weak_supervision_char: np.array, dtype = np.float32, shape = [768, 768]
+# 	:param weak_supervision_affinity: np.array, dtype = np.float32, shape = [768, 768]
+# 	:param crop_size_min: area to crop
+# 	:return:
+# 	"""
+#
+# 	# noinspection PyArgumentList
+# 	np.random.seed()
+#
+# 	channels, height, width = image.shape
+#
+# 	left_x = np.random.randint(min(0, width-crop_size_min[0]), max(0, width - crop_size_min[0]))
+# 	right_x = left_x + crop_size_min[0]
+# 	top_y = np.random.randint(min(0, height-crop_size_min[1]), max(0, height - crop_size_min[1]))
+# 	bottom_y = top_y + crop_size_min[1]
+#
+# 	actual_start_y, actual_start_x = max(0, top_y), max(0, left_x)
+# 	actual_end_y, actual_end_x = min(height, bottom_y), min(width, right_x)
+#
+# 	actual_image = image[:, actual_start_y: actual_end_y, actual_start_x: actual_end_y]
+#
+# 	big_image = np.zeros([channels, crop_size_min[1], crop_size_min[0]], dtype=np.float32)
+# 	big_image[:, (crop_size_min[1] - actual_image.shape[1])//2: (crop_size_min[1] - actual_image.shape[1])//2 + actual_image.shape[1], (crop_size_min[0] - actual_image.shape[2])//2: (crop_size_min[0] - actual_image.shape[2])//2 + actual_image.shape[2]] = actual_image
+#
+# 	image = F.interpolate(
+# 		torch.from_numpy(big_image[None]), (config.image_size[1], config.image_size[0]), mode='bilinear', align_corners=True).numpy()[0]
+#
+# 	cropped_weight_character = weight_character[top_y:bottom_y, left_x:right_x]
+# 	weight_character = F.interpolate(
+# 		torch.from_numpy(
+# 			cropped_weight_character[None, None]), (config.image_size[1], config.image_size[0]), mode='bilinear', align_corners=True).numpy()[0, 0]
+#
+# 	cropped_weight_affinity = weight_affinity[top_y:bottom_y, left_x:right_x]
+# 	weight_affinity = F.interpolate(
+# 		torch.from_numpy(cropped_weight_affinity[None, None]), (config.image_size[1], config.image_size[0]), mode='bilinear', align_corners=True).numpy()[0, 0]
+#
+# 	if weak_supervision_char is not None:
+# 		cropped_weak_supervision_char = weak_supervision_char[top_y:bottom_y, left_x:right_x]
+# 		weak_supervision_char = F.interpolate(
+# 			torch.from_numpy(
+# 				cropped_weak_supervision_char[None, None]), (config.image_size[1], config.image_size[0]), mode='bilinear', align_corners=True).numpy()[0, 0]
+#
+# 	if weak_supervision_affinity is not None:
+# 		cropped_weak_supervision_affinity = weak_supervision_affinity[top_y:bottom_y, left_x:right_x]
+# 		weak_supervision_affinity = F.interpolate(
+# 			torch.from_numpy(
+# 				cropped_weak_supervision_affinity[None, None]), (config.image_size[1], config.image_size[0]), mode='bilinear', align_corners=True).numpy()[0, 0]
+#
+# 	return [image, weight_character, weight_affinity, weak_supervision_char, weak_supervision_affinity]

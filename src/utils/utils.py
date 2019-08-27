@@ -1,8 +1,37 @@
 from shapely.geometry import Polygon
 import numpy as np
 import cv2
-from train_synth.dataloader import two_char_bbox_to_affinity
+from .data_manipulation import two_char_bbox_to_affinity
 import math
+
+
+def resize_bbox(original_dim, output, config):
+
+	max_dim = original_dim.max()
+	resizing_factor = 768 / max_dim
+	before_pad_dim = [int(original_dim[0] * resizing_factor), int(original_dim[1] * resizing_factor)]
+
+	output = np.uint8(output * 255)
+
+	height_pad = (768 - before_pad_dim[0]) // 2
+	width_pad = (768 - before_pad_dim[1]) // 2
+
+	character_bbox = cv2.resize(
+		output[0, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+		(original_dim[1], original_dim[0])) / 255
+
+	affinity_bbox = cv2.resize(
+		output[1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+		(original_dim[1], original_dim[0])) / 255
+
+	generated_targets = generate_word_bbox(
+		character_bbox,
+		affinity_bbox,
+		character_threshold=config.threshold_character,
+		affinity_threshold=config.threshold_affinity,
+		word_threshold=config.threshold_word)
+
+	return generated_targets
 
 
 def poly_to_rect(bbox_contour):
@@ -138,12 +167,15 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 				break
 
 		if original_annotation['text'][orig_no] == unknown_symbol:
-
 			"""
 				If the current original annotation was predicted by the model but the text-annotation is not present 
 				then we create character bbox using predictions and give a weight of 0.5 to the word-bbox
 			"""
-			characters, affinity = cutter(word_bbox=orig_annot, num_characters=len(original_annotation['text'][orig_no]))
+
+			# ToDo - Here generating the cut instead of making it zero otherwise do not care would be treated as background
+			#   Make changes in the code to take care of this
+
+			characters, affinity = cutter(orig_annot, len(original_annotation['text'][orig_no]))
 
 			aligned_generated_targets['characters'][orig_no] = characters
 			aligned_generated_targets['affinity'][orig_no] = affinity
@@ -187,7 +219,8 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 	return aligned_generated_targets
 
 
-def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold, affinity_threshold, word_threshold):
+def generate_word_bbox(
+		character_heatmap, affinity_heatmap, character_threshold, affinity_threshold, word_threshold, spread=3):
 
 	"""
 	Given the character heatmap, affinity heatmap, character and affinity threshold this function generates
@@ -198,6 +231,7 @@ def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold,
 	:param character_threshold: Threshold above which we say pixel belongs to a character
 	:param affinity_threshold: Threshold above which we say a pixel belongs to a affinity
 	:param word_threshold: Threshold of any pixel above which we say a group of characters for a word
+	:param spread: the spread of the gaussian heatmap being generated
 	:return: {
 		'word_bbox': word_bbox, type=np.array, dtype=np.int64, shape=[num_words, 4, 1, 2] ,
 		'characters': char_bbox, type=list of np.array, dtype=np.int64, shape=[num_words, num_characters, 4, 1, 2] ,
@@ -280,12 +314,28 @@ def generate_word_bbox(character_heatmap, affinity_heatmap, character_threshold,
 
 	char_contours = link_to_word_bbox(char_contours, det)
 	affinity_contours = link_to_word_bbox(affinity_contours, det)
+	char_contours = expand_gaussian(char_contours, spread, character_threshold)
+	affinity_contours = expand_gaussian(affinity_contours, spread, affinity_threshold)
 
 	return {
 		'word_bbox': np.array(det, dtype=np.int32).reshape([len(det), 4, 1, 2]),
 		'characters': char_contours,
 		'affinity': affinity_contours,
 	}
+
+
+def expand_gaussian(contours, spread, threshold):
+
+	ratio = spread / 2 / np.sqrt(2 * np.log(1 / threshold))
+
+	expanded_contours = []
+	for word_i in contours:
+		center = np.mean(word_i, axis=1, keepdims=True)
+		centered_contours = word_i - center
+		centered_contours *= ratio
+		expanded_contours.append(centered_contours + center)
+
+	return expanded_contours
 
 
 def link_to_word_bbox(to_find, word_bbox):
@@ -375,17 +425,21 @@ def calc_iou(poly1, poly2):
 	return a.intersection(b).area/union_area
 
 
-def calculate_fscore(pred, target, text_pred=None, text_target=None, threshold=0.5):
+def calculate_fscore(pred, target, text_target, unknown='###', text_pred=None, threshold=0.5):
 
 	"""
 
 	:param pred: numpy array with shape [num_words, 4, 2]
 	:param target: numpy array with shape [num_words, 4, 2]
-	:param text_pred: predicted text (Not useful in CRAFT implementation)
 	:param text_target: target text (Not useful in CRAFT implementation)
+	:param unknown: do not care text bbox
+	:param text_pred: predicted text (Not useful in CRAFT implementation)
 	:param threshold: overlap iou threshold over which we say the pair is positive
 	:return:
 	"""
+
+	if pred.shape[0] == target.shape[0] == 0:
+		return 1
 
 	if text_pred is None:
 		check_text = False
@@ -418,18 +472,25 @@ def calculate_fscore(pred, target, text_pred=None, text_target=None, threshold=0
 		if not found:
 			false_positive += 1
 
-	true_positive = np.sum(already_done.astype(np.float32))
+	if text_target is not None:
+		true_positive = np.sum(already_done.astype(np.float32)[np.where(np.array(text_target) != unknown)[0]])
+	else:
+		true_positive = np.sum(already_done.astype(np.float32))
 
 	if true_positive == 0:
 		return 0
 
 	precision = true_positive/(true_positive + false_positive)
-	recall = true_positive/target.shape[0]
+
+	if text_target is not None:
+		recall = true_positive/((np.where(np.array(text_target) != unknown)[0]).shape[0])
+	else:
+		recall = true_positive / len(target)
 
 	return 2*precision*recall/(precision + recall)
 
 
-def calculate_batch_fscore(pred, target, text_pred=None, text_target=None, threshold=0.5):
+def calculate_batch_fscore(pred, target, text_target, unknown='###', text_pred=None, threshold=0.5):
 
 	"""
 	Function to calculate the F-score of an entire batch. If lets say the model also predicted text,
@@ -437,28 +498,20 @@ def calculate_batch_fscore(pred, target, text_pred=None, text_target=None, thres
 
 	:param pred: list of numpy array having shape [num_words, 4, 2]
 	:param target: list of numpy array having shape [num_words, 4, 2]
-	:param text_pred: list of predicted text, (not useful for CRAFT)
 	:param text_target: list of target text, (not useful for CRAFT)
+	:param text_pred: list of predicted text, (not useful for CRAFT)
+	:param unknown: text specifying do not care scenario
 	:param threshold: threshold value for iou above which we say a pair of bbox are positive
 	:return:
 	"""
-
+	if text_target is None:
+		text_target = [None for _ in range(len(pred))]
 	f_score = 0
 	for i in range(len(pred)):
 		if text_pred is not None:
-			f_score += calculate_fscore(pred[i], target[i], text_pred[i], text_target[i], threshold)
+			f_score += calculate_fscore(pred[i], target[i], text_target[i], unknown, text_pred[i], threshold)
 		else:
-			f_score += calculate_fscore(pred[i], target[i], threshold=threshold)
-
-	# The corner case of there being no text in the image
-
-	if len(pred) == 0 and len(target) == 0:
-		return 1
-
-	# The corner case of len(pred) being zero so f_score/len(pred) would give nan, though actually it should be 0
-
-	elif len(pred) == 0:
-		return 0
+			f_score += calculate_fscore(pred[i], target[i], text_target[i], unknown, threshold=threshold)
 
 	return f_score/len(pred)
 

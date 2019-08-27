@@ -1,9 +1,6 @@
 import torchvision
 from torch import nn
 import torch
-from torch.nn import functional as F
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 class ConvBlock(nn.Module):

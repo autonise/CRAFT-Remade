@@ -21,10 +21,10 @@ def init_weights(modules):
             m.bias.data.zero_()
 
 
-class VGG16_BN(torch.nn.Module):
+class VGG16BN(torch.nn.Module):
 
     def __init__(self, pretrained=True, freeze=True):
-        super(VGG16_BN, self).__init__()
+        super(VGG16BN, self).__init__()
         model_urls['vgg16_bn'] = model_urls['vgg16_bn'].replace('https://', 'http://')
         vgg_pretrained_features = models.vgg16_bn(pretrained=pretrained).features
         self.slice1 = torch.nn.Sequential()
@@ -41,7 +41,6 @@ class VGG16_BN(torch.nn.Module):
         for x in range(29, 39):         # conv5_3
             self.slice4.add_module(str(x), vgg_pretrained_features[x])
 
-        # fc6, fc7 without atrous conv
         self.slice5 = torch.nn.Sequential(
                 nn.MaxPool2d(kernel_size=3, stride=1, padding=1),
                 nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6),

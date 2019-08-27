@@ -28,7 +28,10 @@ def get_initial_model_optimizer(path):
 		model = CRAFT()
 		model = DataParallelModel(model)
 		saved_model = torch.load(path)
-		model.load_state_dict(saved_model)
+		if 'state_dict' in saved_model.keys():
+			model.load_state_dict(saved_model['state_dict'])
+		else:
+			model.load_state_dict(saved_model)
 
 	if config.use_cuda:
 		model = model.cuda()

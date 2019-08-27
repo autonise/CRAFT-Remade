@@ -1,5 +1,3 @@
-from src.generic_model import Criterian
-from .dataloader import DataLoaderSYNTH, denormalize_mean_variance
 from torch.utils.data import DataLoader
 import torch
 from tqdm import tqdm
@@ -8,8 +6,11 @@ from shutil import copyfile
 import numpy as np
 import matplotlib.pyplot as plt
 import random
-import train_synth.config as config
 
+from src.generic_model import Criterian
+from .dataloader import DataLoaderSYNTH
+from src.utils.data_manipulation import denormalize_mean_variance
+import train_synth.config as config
 from src.utils.parallel import DataParallelModel, DataParallelCriterion
 from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch
 
@@ -17,7 +18,7 @@ from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
 
-def save(data, output, target, target_affinity, epoch, no):
+def save(data, output, target, target_affinity, no):
 
 	"""
 	Saving the synthesised outputs in between the training
@@ -26,7 +27,6 @@ def save(data, output, target, target_affinity, epoch, no):
 	:param target: character heatmap target as tensor
 	:param target_affinity: affinity heatmap target as tensor
 	:param no: current iteration number
-	:param epoch: current epoch
 	:return: None
 	"""
 
@@ -37,7 +37,7 @@ def save(data, output, target, target_affinity, epoch, no):
 
 	batch_size = output.shape[0]
 
-	base = config.DataLoaderSYNTH_Train_Synthesis+str(epoch)+'_'+str(no)+'/'
+	base = config.DataLoaderSYNTH_Train_Synthesis+str(no)+'/'
 
 	os.makedirs(base, exist_ok=True)
 
@@ -67,7 +67,7 @@ def save(data, output, target, target_affinity, epoch, no):
 			cmap='gray')
 
 
-def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_loss, all_accuracy):
+def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, all_accuracy):
 
 	"""
 	Function to test
@@ -76,7 +76,6 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 	:param model: Pytorch model of UNet-ResNet
 	:param optimizer: Adam Optimizer
 	:param starting_no: how many items to skip in the dataloader
-	:param epoch: current epoch
 	:param all_loss: list of all loss values
 	:param all_accuracy: list of all f-scores
 	:return: all iteration loss values
@@ -96,8 +95,7 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 
 	for no, (image, weight, weight_affinity) in enumerate(iterator):
 
-		if epoch == 0:
-			change_lr(no)
+		change_lr(no)
 
 		if config.pretrained:
 			if no == starting_no:
@@ -112,30 +110,32 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 		output = model(image)
 		loss = loss_criterian(output, weight, weight_affinity).mean()/4
 
-		all_loss.append(loss.item()*4)
+		all_loss.append(loss.item()*config.optimizer_iteration)
 
 		loss.backward()
 
-		if (no + 1) % 4 == 0:
+		if (no + 1) % config.optimizer_iteration == 0:
 			optimizer.step()
 			optimizer.zero_grad()
 
 		if len(all_accuracy) == 0:
 			iterator.set_description(
-				'Loss:' + str(int(loss.item() * 4 * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
+				'Loss:' + str(
+					int(loss.item() * config.optimizer_iteration * 100000000) / 100000000) +
+				' Iterations:[' + str(no) + '/' + str(
 					len(iterator)) +
 				'] Average Loss:' + str(int(np.array(all_loss)[-min(1000, len(all_loss)):].mean() * 100000000) / 100000000))
 
 		else:
 
 			iterator.set_description(
-				'Loss:' + str(int(loss.item() * 4 * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
-					len(iterator)) +
+				'Loss:' + str(int(loss.item() * config.optimizer_iteration * 100000000) / 100000000) + ' Iterations:[' +
+				str(no) + '/' + str(len(iterator)) +
 				'] Average Loss:' + str(int(np.array(all_loss)[-min(1000, len(all_loss)):].mean()*100000000)/100000000) +
 				'| Average F-Score: ' + str(int(np.array(all_accuracy)[-min(1000, len(all_accuracy)):].mean()*100000000)/100000000)
 			)
 
-		if no >= 3000:
+		if no >= 0:
 
 			# Calculating the f-score after some iterations because initially there are a lot of stray contours
 
@@ -160,16 +160,20 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, epoch, all_
 					word_threshold=config.threshold_word,
 				)
 
-				all_accuracy.append(calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore))
+				all_accuracy.append(
+					calculate_batch_fscore(
+						predicted_bbox, target_bbox, threshold=config.threshold_fscore, text_target=None
+					)
+				)
 
-		if no % config.periodic_output == 0 and no != 0:
+		if no % config.periodic_output == 0:
 
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
 
-			save(image, output, weight, weight_affinity, epoch, no)
+			save(image, output, weight, weight_affinity, no)
 
-		if no % config.periodic_save == 0 and no != 0:
+		if no % config.periodic_save == 0:
 
 			torch.save(
 				{
@@ -217,14 +221,8 @@ def main():
 	model = DataParallelModel(model)
 	loss_criterian = DataParallelCriterion(Criterian())
 
-	train_dataloader = DataLoaderSYNTH('train')
-
 	if config.use_cuda:
 		model = model.cuda()
-
-	train_dataloader = DataLoader(
-		train_dataloader, batch_size=config.batch_size['train'],
-		shuffle=True, num_workers=12)
 
 	optimizer = torch.optim.Adam(model.parameters(), lr=config.lr[1])
 
@@ -234,6 +232,7 @@ def main():
 		optimizer.load_state_dict(saved_model['optimizer'])
 		starting_no = int(config.pretrained_path.split('/')[-1].split('_')[0])
 		all_loss = np.load(config.pretrained_loss_plot_training).tolist()
+		print('Loaded the model')
 
 	else:
 		starting_no = 0
@@ -241,12 +240,14 @@ def main():
 
 	all_accuracy = []
 
-	for epoch in range(1, 2):
-		if epoch != 0:
-			starting_no = 0
-		all_loss += train(
-			train_dataloader, loss_criterian, model, optimizer, starting_no=starting_no, epoch=epoch,
-			all_loss=all_loss, all_accuracy=all_accuracy)
+	train_dataloader = DataLoaderSYNTH('train')
+	train_dataloader = DataLoader(
+		train_dataloader, batch_size=config.batch_size['train'],
+		shuffle=True, num_workers=config.num_workers['train'])
+
+	all_loss = train(
+		train_dataloader, loss_criterian, model, optimizer, starting_no=starting_no,
+		all_loss=all_loss, all_accuracy=all_accuracy)
 
 	torch.save(
 		{

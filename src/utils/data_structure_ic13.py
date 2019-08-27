@@ -3,19 +3,17 @@ import numpy as np
 import json
 
 
-def icdar2013_test():
+def icdar2013_test(
+		base_path='/home/SharedData/Mayank/ICDAR2013/Images/test/Challenge2_Test_Task1_GT',
+		output_path='/home/SharedData/Mayank/ICDAR2013/Images/test_gt.json'):
+
 	"""
 	This function converts the icdar 2013 challenge 2 images to the format which we need
 	to train our weak supervision model.
-	More data set conversion functions would be written here
+	:param base_path: Put your path to ground truth folder for icdar 2013 data set
+	:param output_path: Will convert the ground truth to a json format at the location output_path
 	:return: None
 	"""
-
-	# Put your path to ground truth folder for icdar 2013 data set
-	base_path = '/home/SharedData/Mayank/ICDAR2013/Images/test/Challenge2_Test_Task1_GT'
-
-	# Will convert the ground truth to a json format at the location output_path
-	output_path = '/home/SharedData/Mayank/ICDAR2013/Images/test_gt.json'
 
 	all_transcriptions = os.listdir(base_path)
 
@@ -50,7 +48,7 @@ def icdar2013_test():
 
 		with open(base_path + '/' + i, 'r') as f:
 			for no, f_i in enumerate(f):
-				x, text = f_i[:-1].split(',')[0:4], ','.join(f_i[:-1].split(',')[4:])
+				x, text = f_i[:-1].split(',')[0:4], ','.join(f_i[:-1].split(',')[4:])[2:-1]
 				annots = [[x[0], x[1]], [x[0], x[3]], [x[2], x[3]], [x[2], x[1]]]
 				cur_annot.append(np.array(annots, dtype=np.int32).reshape([4, 2]).tolist())
 				cur_text.append(text)
@@ -62,19 +60,17 @@ def icdar2013_test():
 		json.dump(all_annots, f)
 
 
-def icdar2013_train():
+def icdar2013_train(
+		base_path='/home/SharedData/Mayank/ICDAR2013/Images/train/ch2_training_localization_transcription_gt',
+		output_path='/home/SharedData/Mayank/ICDAR2013/Images/train_gt.json'):
 	"""
 	This function converts the icdar 2013 challenge 2 images to the format which we need
 	to train our weak supervision model.
 	More data set conversion functions would be written here
+	:param base_path: Put your path to ground truth folder for icdar 2013 data set
+	:param output_path: Will convert the ground truth to a json format at the location output_path
 	:return: None
 	"""
-
-	# Put your path to ground truth folder for icdar 2013 data set
-	base_path = '/home/SharedData/Mayank/ICDAR2013/Images/train/Challenge2_Test_Task1_GT'
-
-	# Will convert the ground truth to a json format at the location output_path
-	output_path = '/home/SharedData/Mayank/ICDAR2013/Images/train_gt.json'
 
 	all_transcriptions = os.listdir(base_path)
 
@@ -120,9 +116,3 @@ def icdar2013_train():
 
 	with open(output_path, 'w') as f:
 		json.dump(all_annots, f)
-
-
-if __name__ == "__main__":
-
-	# Currently only one dataset supported
-	icdar2013_test()
