@@ -21,10 +21,10 @@ def init_weights(modules):
             m.bias.data.zero_()
 
 
-class vgg16_bn(torch.nn.Module):
+class VGG16_BN(torch.nn.Module):
 
     def __init__(self, pretrained=True, freeze=True):
-        super(vgg16_bn, self).__init__()
+        super(VGG16_BN, self).__init__()
         model_urls['vgg16_bn'] = model_urls['vgg16_bn'].replace('https://', 'http://')
         vgg_pretrained_features = models.vgg16_bn(pretrained=pretrained).features
         self.slice1 = torch.nn.Sequential()
@@ -58,10 +58,10 @@ class vgg16_bn(torch.nn.Module):
 
         if freeze:
             for param in self.slice1.parameters():      # only first conv
-                param.requires_grad= False
+                param.requires_grad = False
 
-    def forward(self, X):
-        h = self.slice1(X)
+    def forward(self, x):
+        h = self.slice1(x)
         h_relu2_2 = h
         h = self.slice2(h)
         h_relu3_2 = h
