@@ -28,15 +28,26 @@ Put the images inside a folder.
 
     python main.py train_synth --mode=synthesize --model=./model/final_model.pkl --folder=./input
     
+## Results
+
+| Dataset | Recall | Precision | F-score |
+|---------|--------|-----------|---------|
+| ICDAR2013 | TBD | TBD | 0.7051(Improving) |
+| ICDAR2015 | TBD | TBD | TBD(Coming Soon) |
+| ICDAR2017 | TBD | TBD | TBD(Coming Soon) |
+| Total Text | TBD | TBD | TBD(Coming Soon) |
+| MS COCO | TBD | TBD | TBD(Coming Soon) |
+
 ## Pre-trained models
 
 ### Strong Supervision
 
-SynthText - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<br>
+SynthText - https://drive.google.com/open?id=1QH0B-iQ1Ob2HkWCQ2bVCsLPwVSmbcSgN<br>
+Original Model by authors - https://drive.google.com/open?id=1ZQE0tK9498RhLcXwYRgod4upmrYWdgl9<br>
     
 ### Weak Supervision
 
-- [ ] ICDAR 2013 - In Progress
+- [ ] ICDAR 2013 - https://drive.google.com/open?id=1hs1xoLuHwEqNUVAxsXqf2WOQZKhCcF3H
 - [ ] ICDAR 2015 - In Progress
 - [ ] ICDAR 2017 - yet_to_be_completed
 - [ ] Total Text - yet_to_be_completed
