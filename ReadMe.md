@@ -26,7 +26,7 @@ Put the images inside a folder.
 <br>Get a pre-trained model from the pre-trained model list (Currently only strong supervision using SYNTH-Text available)
 <br>Run the command - 
 
-    python main.py train_synth --mode=synthesize --model=./model/final_model.pkl --folder=./input
+    python main.py synthesize --model=./model/final_model.pkl --folder=./input
     
 ## Results
 
