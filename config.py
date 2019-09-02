@@ -1,20 +1,22 @@
 seed = 0
 
+dataset_name = 'ICDAR2013_ICDAR2017'
+test_dataset_name = 'ICDAR2013'
+
 DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
 DataLoaderSYNTH_mat = '/home/SharedData/Mayank/SynthText/gt.mat'
 DataLoaderSYNTH_Train_Synthesis = '/home/SharedData/Mayank/Models/SYNTH/train_synthesis/'
 
-DataLoader_Other_Synthesis = '/home/SharedData/Mayank/ICDAR2015/Save/'
+DataLoader_Other_Synthesis = '/home/SharedData/Mayank/'+dataset_name+'/Save/'
+Other_Dataset_Path = '/home/SharedData/Mayank/'+dataset_name
+save_path = '/home/SharedData/Mayank/Models/WeakSupervision/'+dataset_name
+images_path = '/home/SharedData/Mayank/'+dataset_name+'/Images'
+target_path = '/home/SharedData/Mayank/'+dataset_name+'/Generated'
 
-Other_Dataset_Path = '/home/SharedData/Mayank/ICDAR2015'
+Test_Dataset_Path = '/home/SharedData/Mayank/'+test_dataset_name
 
-save_path = '/home/SharedData/Mayank/Models/WeakSupervision/ICDAR2015'
-
-images_path = '/home/SharedData/Mayank/ICDAR2015/Images'
-target_path = '/home/SharedData/Mayank/ICDAR2015/Generated'
-
-threshold_character = 0.4
-threshold_affinity = 0.4
+threshold_character = 0.5
+threshold_affinity = 0.5
 threshold_word = 0.7
 threshold_fscore = 0.5
 

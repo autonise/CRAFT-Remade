@@ -9,15 +9,15 @@ use_cuda = True
 
 batch_size = {
 	'train': 4*len(num_cuda.split(',')),
-	'test': 3,
+	'test': 8*len(num_cuda.split(',')),
 }
 
 num_workers = {
-	'train': 8,
-	'test': 8
+	'train': 16,
+	'test': 16
 }
 
-pretrained = False
+pretrained = True
 pretrained_path = '/home/SharedData/Mayank/Models/SYNTH/63000_model.pkl'
 pretrained_loss_plot_training = '/home/SharedData/Mayank/Models/SYNTH/loss_plot_training.npy'
 
@@ -38,19 +38,7 @@ optimizer_iteration = 1
 
 visualize_generated = False
 
-
-def get_weight_threshold(min_, max_, iteration):
-
-	import numpy as np
-	weight_threshold_ = []
-	for i in range(iteration-1):
-		weight_threshold_.append(min_ + i*(max_ - min_)/(iteration-1))
-
-	weight_threshold_.append(max_)
-	return np.flip(np.array(weight_threshold_))
-
-
-weight_threshold = get_weight_threshold(0.5, 0.5, 20)
+weight_threshold = 0.5
 
 model_architecture = 'craft'
 

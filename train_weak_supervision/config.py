@@ -8,47 +8,38 @@ seed = 0
 use_cuda = True
 num_cuda = "0,1,2,3"
 
-prob_synth = 0
+prob_synth = 1/6
 
 check_path = 'Temporary/'
 
 batch_size = {
-	'train': 4,
-	'test': 3,
+	'train': 4*len(num_cuda.split(',')),
+	'test': 8*len(num_cuda.split(',')),
 }
 
 num_workers = {
-	'train': 8,
-	'test': 8
+	'train': 16,
+	'test': 16
 }
 
 
 lr = {
-	0: 1e-4,
-	1: 1e-4,
-	2: 1e-4,
-	3: 1e-5,
-	4: 5e-5,
-	5: 5e-5,
-	6: 5e-5,
-	7: 5e-5,
-	8: 1e-5,
-	9: 1e-5,
-	10: 1e-5,
-	11: 1e-5,
-	12: 5e-6,
-	13: 5e-6,
-	14: 5e-6,
-	15: 5e-6,
-	16: 1e-6,
-	17: 1e-6,
-	18: 1e-6,
-	19: 1e-6,
+	0: 1e-6,
+	1: 1e-6,
+	2: 5e-7,
+	3: 5e-7,
+	4: 5e-7,
+	5: 5e-7,
+	6: 1e-7,
+	7: 1e-7,
+	8: 1e-7,
+	9: 1e-7,
 }
 
-optimizer_iterations = 4
+optimizer_iterations = 1
 iterations = batch_size['train']*2500*optimizer_iterations
-check_iterations = 200
+check_iterations = 1249
+calc_f_score = 100
 
 model_architecture = 'craft'
 
