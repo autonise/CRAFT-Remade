@@ -3,16 +3,16 @@ import numpy as np
 import cv2
 
 
-sigma = 10
-spread = 3
-extent = int(spread * sigma)
-center = spread * sigma / 2
-gaussian_heatmap = np.zeros([extent, extent], dtype=np.float32)
+sigma = 18
+threshold_point = 25
+window = 120
+center = window//2
+gaussian_heatmap = np.zeros([window, window], dtype=np.float32)
 
-for i_ in range(extent):
-	for j_ in range(extent):
+for i_ in range(window):
+	for j_ in range(window):
 		gaussian_heatmap[i_, j_] = 1 / 2 / np.pi / (sigma ** 2) * np.exp(
-			-1 / 2 * ((i_ - center - 0.5) ** 2 + (j_ - center - 0.5) ** 2) / (sigma ** 2))
+			-1 / 2 * ((i_ - center) ** 2 + (j_ - center) ** 2) / (sigma ** 2))
 
 gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
 
@@ -55,16 +55,22 @@ def order_points(pts):
 	return rect
 
 
-def four_point_transform(image, pts):
+def four_point_transform(image, pts, size):
 
 	"""
 	Using the pts and the image a perspective transform is performed which returns the transformed 2d Gaussian image
 	:param image: np.array, dtype=np.uint8, shape = [height, width]
 	:param pts: np.array, dtype=np.float32 or np.int32, shape = [4, 2]
+	:param size: size of the original image, list [height, width]
 	:return:
 	"""
 
-	max_x, max_y = np.max(pts[:, 0]).astype(np.int32), np.max(pts[:, 1]).astype(np.int32)
+	height, width = size
+
+	center_pt = np.mean(pts, axis=0)
+	pts = pts - center_pt[None, :]
+	pts = pts*center/threshold_point
+	pts = pts + center_pt[None, :]
 
 	dst = np.array([
 		[0, 0],
@@ -72,7 +78,7 @@ def four_point_transform(image, pts):
 		[image.shape[1] - 1, image.shape[0] - 1],
 		[0, image.shape[0] - 1]], dtype="float32")
 
-	warped = cv2.warpPerspective(image, cv2.getPerspectiveTransform(dst, pts), (max_x, max_y))
+	warped = cv2.warpPerspective(image, cv2.getPerspectiveTransform(dst, pts), (width, height))
 
 	return warped
 
@@ -156,38 +162,16 @@ def add_character(image, bbox):
 		:return: image in which the gaussian character bbox has been added
 	"""
 
-	backup = image.copy()
+	# ToDo - Make this function efficient
 
-	try:
-
-		if not Polygon(bbox.reshape([4, 2]).astype(np.int32)).is_valid:
-			return image
-
-		top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
-		top_right = np.array([np.max(bbox[:, 0]), np.max(bbox[:, 1])]).astype(np.int32)
-
-		if top_right[1] < 0 or top_right[0] < 0:
-			return image
-		if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
-			return image
-		bbox -= top_left[None, :]
-		transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32))
-
-		start_row = max(top_left[1], 0) - top_left[1]
-		start_col = max(top_left[0], 0) - top_left[0]
-		end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
-		end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
-
-		image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
-			transformed[
-			start_row:end_row - top_left[1],
-			start_col:end_col - top_left[0]]
-
+	if not Polygon(bbox.reshape([4, 2]).astype(np.int32)).is_valid:
 		return image
 
-	except:
+	transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32), [image.shape[0], image.shape[1]])
 
-		return backup
+	image = np.maximum(image, transformed)
+
+	return image
 
 
 def add_character_others(image, weight_map, weight_val, bbox):
@@ -201,38 +185,14 @@ def add_character_others(image, weight_map, weight_val, bbox):
 					weight_map in which the weight as per weak-supervision has been calculated
 	"""
 
-	backup = (image.copy(), weight_map.copy())
+	# ToDo - Make this function efficient
 
-	try:
+	transformed = four_point_transform(
+		gaussian_heatmap.copy(), bbox.astype(np.float32), [weight_map.shape[0], weight_map.shape[1]])
+	image = np.maximum(image, transformed)
+	weight_map = np.maximum(weight_map, np.float32(transformed >= 0.4*255)*weight_val)
 
-		if not Polygon(bbox.reshape([4, 2]).astype(np.int32)).is_valid:
-			return image, weight_map
-
-		top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
-		if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
-			return image, weight_map
-		bbox -= top_left[None, :]
-		transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32))
-
-		start_row = max(top_left[1], 0) - top_left[1]
-		start_col = max(top_left[0], 0) - top_left[0]
-		end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
-		end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
-		image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
-			transformed[
-			start_row:end_row - top_left[1],
-			start_col:end_col - top_left[0]]
-
-		weight_map[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
-			np.float32(transformed[
-				start_row:end_row - top_left[1],
-				start_col:end_col - top_left[0]] != 0)*weight_val
-
-		return image, weight_map
-
-	except:
-
-		return backup
+	return image, weight_map
 
 
 def add_affinity(image, bbox_1, bbox_2):
@@ -278,6 +238,9 @@ def two_char_bbox_to_affinity(bbox_1, bbox_2):
 
 	bbox_1 = bbox_1[:, 0, :].copy()
 	bbox_2 = bbox_2[:, 0, :].copy()
+
+	bbox_1 = order_points(bbox_1)
+	bbox_2 = order_points(bbox_2)
 
 	center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
 	tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
@@ -334,7 +297,7 @@ def generate_target(image_size, character_bbox, weight=None):
 		target = add_character(target, character_bbox[i].copy())
 
 	if weight is not None:
-		return target/255, np.float32(target != 0)
+		return target/255, np.float32(target >= 0.4)
 	else:
 		return target/255
 
@@ -399,13 +362,15 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 			total_letters += 1
 		total_letters += 1
 
+	target = target / 255
+
 	if weight is not None:
 
-		return target / 255, np.float32(target != 0)
+		return target, np.float32(target >= 0.4)
 
 	else:
 
-		return target / 255
+		return target
 
 
 def generate_affinity_others(image_size, character_bbox, weight):

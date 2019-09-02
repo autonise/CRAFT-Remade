@@ -83,6 +83,14 @@ class DataLoaderSYNTH(data.Dataset):
 
 		item = item % len(self.imnames)
 		image = plt.imread(self.base_path+'/'+self.imnames[item][0])  # Read the image
+
+		if len(image.shape) == 2:
+			image = np.repeat(image[:, :, None], repeats=3, axis=2)
+		elif image.shape[2] == 1:
+			image = np.repeat(image, repeats=3, axis=2)
+		else:
+			image = image[:, :, 0: 3]
+
 		image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
 		image = normalize_mean_variance(image).transpose(2, 0, 1)
 		weight_character = generate_target(image.shape, character.copy())  # Generate character heatmap
@@ -115,6 +123,13 @@ class DataLoaderEval(data.Dataset):
 	def __getitem__(self, item):
 
 		image = plt.imread(self.base_path+'/'+self.imnames[item])  # Read the image
+
+		if len(image.shape) == 2:
+			image = np.repeat(image[:, :, None], repeats=3, axis=2)
+		elif image.shape[2] == 1:
+			image = np.repeat(image, repeats=3, axis=2)
+		else:
+			image = image[:, :, 0: 3]
 
 		# ------ Resize the image to (768, 768) ---------- #
 

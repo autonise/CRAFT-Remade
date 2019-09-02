@@ -72,6 +72,8 @@ class CRAFT(nn.Module):
 
         y = self.conv_cls(feature)
 
+        # ToDo - Remove the interpolation and make changes in the dataloader to make target width, height //2
+
         y = F.interpolate(y, size=(768, 768), mode='bilinear', align_corners=False)
 
         return y

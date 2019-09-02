@@ -28,6 +28,8 @@ class DataLoaderMIX(data.Dataset):
 
 		if config.prob_synth != 0:
 
+			print('Loading Synthetic dataset')
+
 			if DEBUG:  # Make this True if you want to do a run on small set of Synth-Text
 				if not os.path.exists('cache.pkl'):
 
@@ -84,7 +86,7 @@ class DataLoaderMIX(data.Dataset):
 
 		for i in sorted(os.listdir(self.base_path_other_gt)):
 			with open(self.base_path_other_gt+'/'+i, 'r') as f:
-				self.gt.append(['.'.join(i.split('.')[:-1]) + '.jpg', json.load(f)])
+				self.gt.append([i[:-5], json.load(f)])
 
 	def __getitem__(self, item_i):
 
@@ -100,6 +102,14 @@ class DataLoaderMIX(data.Dataset):
 			character = self.charBB[random_item].copy()
 
 			image = plt.imread(self.base_path_synth+'/'+self.imnames[random_item][0])  # Read the image
+
+			if len(image.shape) == 2:
+				image = np.repeat(image[:, :, None], repeats=3, axis=2)
+			elif image.shape[2] == 1:
+				image = np.repeat(image, repeats=3, axis=2)
+			else:
+				image = image[:, :, 0: 3]
+
 			height, width, channel = image.shape
 			image, character = resize(image, character)  # Resize the image to (768, 768)
 			image = normalize_mean_variance(image).transpose(2, 0, 1)
@@ -120,6 +130,14 @@ class DataLoaderMIX(data.Dataset):
 
 			random_item = np.random.randint(len(self.gt))
 			image = plt.imread(self.base_path_other_images+'/'+self.gt[random_item][0])  # Read the image
+
+			if len(image.shape) == 2:
+				image = np.repeat(image[:, :, None], repeats=3, axis=2)
+			elif image.shape[2] == 1:
+				image = np.repeat(image, repeats=3, axis=2)
+			else:
+				image = image[:, :, 0: 3]
+
 			height, width, channel = image.shape
 			character = [
 				np.array(word_i).reshape([len(word_i), 4, 1, 2]) for word_i in self.gt[random_item][1]['characters'].copy()]
@@ -132,7 +150,13 @@ class DataLoaderMIX(data.Dataset):
 			image, character, affinity = resize_generated(image, character.copy(), affinity.copy())
 			image = normalize_mean_variance(image).transpose(2, 0, 1)
 			weights = [i for i in self.gt[random_item][1]['weights'].copy()]
-			text_target = '~'.join(self.gt[random_item][1]['text'].copy())
+			text_target = '#@#@#@'.join(self.gt[random_item][1]['text'])
+
+			assert len(self.gt[random_item][1]['text']) == len(self.gt[random_item][1]['word_bbox']), \
+				'Length of word_bbox != Length of text'
+
+			# assert len(text_target.split('#@#@#@')) == len(self.gt[random_item][1]['word_bbox']), \
+			# 	'Some error in splitting'
 
 			# Generate character heatmap with weights
 			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights.copy())
@@ -164,7 +188,7 @@ class DataLoaderMIX(data.Dataset):
 			return len(self.gt)
 
 
-class DataLoaderEvalICDAR2013(data.Dataset):
+class DataLoaderEvalOther(data.Dataset):
 
 	"""
 		ICDAR 2013 dataloader
@@ -173,7 +197,11 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 	def __init__(self, type_):
 
 		self.type_ = type_
-		self.base_path = config.Other_Dataset_Path + '/Images/'
+		if self.type_ == 'train':
+			self.base_path = config.Other_Dataset_Path + '/Images/'
+		else:
+			self.base_path = config.Test_Dataset_Path + '/Images/'
+
 		with open(self.base_path + self.type_ + '_gt.json', 'r') as f:
 			self.gt = json.load(f)
 
@@ -189,6 +217,13 @@ class DataLoaderEvalICDAR2013(data.Dataset):
 		"""
 
 		image = plt.imread(self.base_path+self.type_+'/'+self.imnames[item])
+
+		if len(image.shape) == 2:
+			image = np.repeat(image[:, :, None], repeats=3, axis=2)
+		elif image.shape[2] == 1:
+			image = np.repeat(image, repeats=3, axis=2)
+		else:
+			image = image[:, :, 0: 3]
 
 		height, width, channel = image.shape
 		max_side = max(height, width)

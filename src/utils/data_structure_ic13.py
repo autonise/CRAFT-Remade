@@ -4,18 +4,20 @@ import json
 
 
 def icdar2013_test(
-		base_path='/home/SharedData/Mayank/ICDAR2013/Images/test/Challenge2_Test_Task1_GT',
-		output_path='/home/SharedData/Mayank/ICDAR2013/Images/test_gt.json'):
+		image_path='Challenge2_Test_Task12_Images',
+		base_path='Challenge2_Test_Task1_GT',
+		output_path='test_gt.json'):
 
 	"""
 	This function converts the icdar 2013 challenge 2 images to the format which we need
 	to train our weak supervision model.
+	:param image_path: Put the path to the test images
 	:param base_path: Put your path to ground truth folder for icdar 2013 data set
 	:param output_path: Will convert the ground truth to a json format at the location output_path
 	:return: None
 	"""
 
-	all_transcriptions = os.listdir(base_path)
+	all_transcriptions = os.listdir(image_path)
 
 	# Sometimes the bbox is marked but the text is not marked.
 	# This is the symbol(unknown = '###') that was used in icdar 2013 to denote that text annotation is missing
@@ -38,9 +40,9 @@ def icdar2013_test(
 
 	all_annots = {'unknown': unknown, 'annots': {}}
 
-	for i in all_transcriptions:
+	for image_name in all_transcriptions:
 
-		image_name = i[3:].split('.')[0] + '.jpg'
+		i = 'gt_'+'.'.join(image_name.split('.')[:-1])+'.txt'
 		all_annots['annots'][image_name] = {}
 
 		cur_annot = []
@@ -61,18 +63,20 @@ def icdar2013_test(
 
 
 def icdar2013_train(
-		base_path='/home/SharedData/Mayank/ICDAR2013/Images/train/ch2_training_localization_transcription_gt',
-		output_path='/home/SharedData/Mayank/ICDAR2013/Images/train_gt.json'):
+		image_path='ch2_training_images',
+		base_path='ch2_training_localization_transcription_gt',
+		output_path='train_gt.json'):
 	"""
 	This function converts the icdar 2013 challenge 2 images to the format which we need
 	to train our weak supervision model.
 	More data set conversion functions would be written here
+	:param image_path: Put the path to the test images
 	:param base_path: Put your path to ground truth folder for icdar 2013 data set
 	:param output_path: Will convert the ground truth to a json format at the location output_path
 	:return: None
 	"""
 
-	all_transcriptions = os.listdir(base_path)
+	all_transcriptions = os.listdir(image_path)
 
 	# Sometimes the bbox is marked but the text is not marked.
 	# This is the symbol(unknown = '###') that was used in icdar 2013 to denote that text annotation is missing
@@ -95,9 +99,9 @@ def icdar2013_train(
 
 	all_annots = {'unknown': unknown, 'annots': {}}
 
-	for i in all_transcriptions:
+	for image_name in all_transcriptions:
 
-		image_name = i[3:].split('.')[0] + '.jpg'
+		i = 'gt_'+'.'.join(image_name.split('.')[:-1])+'.txt'
 		all_annots['annots'][image_name] = {}
 
 		cur_annot = []
@@ -116,3 +120,9 @@ def icdar2013_train(
 
 	with open(output_path, 'w') as f:
 		json.dump(all_annots, f)
+
+
+if __name__ == "__main__":
+
+	icdar2013_test()
+	icdar2013_train()

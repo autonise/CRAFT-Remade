@@ -3,6 +3,7 @@
     <words>
       <w>annot</w>
       <w>annots</w>
+      <w>astype</w>
       <w>basenet</w>
       <w>bicubic</w>
       <w>bilinear</w>
@@ -32,9 +33,11 @@
       <w>relu</w>
       <w>resnet</w>
       <w>scipy</w>
+      <w>sqrt</w>
       <w>synth</w>
       <w>thresholded</w>
       <w>thresholding</w>
+      <w>torchvision</w>
       <w>tqdm</w>
       <w>uint</w>
       <w>unet</w>

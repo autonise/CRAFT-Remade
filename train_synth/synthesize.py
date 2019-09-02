@@ -106,7 +106,7 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character, base_
 					cmap='gray')
 
 
-def generate_next_targets(original_dim, output, image, base_target_path, image_name, annots, dataloader, iteration):
+def generate_next_targets(original_dim, output, image, base_target_path, image_name, annots, dataloader):
 
 	max_dim = original_dim.max()
 	resizing_factor = 768 / max_dim
@@ -169,7 +169,7 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 	generated_targets = get_weighted_character_target(
 		generated_targets, {'bbox': annots['bbox'], 'text': annots['text']},
 		dataloader.dataset.unknown,
-		config.threshold_fscore, config.weight_threshold[iteration])
+		config.threshold_fscore, config.weight_threshold)
 
 	target_word_bbox = generated_targets['word_bbox'].copy()
 
@@ -178,7 +178,7 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 			target_word_bbox[:, :, 0, :],
 			text_target=annots['text'],
 			unknown=dataloader.dataset.gt['unknown']
-		)
+		)['f_score']
 
 	if config.visualize_generated:
 		image_i = denormalize_mean_variance(image.data.cpu().numpy().transpose(1, 2, 0))
@@ -237,13 +237,13 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 	generated_targets['characters'] = [word_i.tolist() for word_i in generated_targets['characters']]
 	generated_targets['affinity'] = [word_i.tolist() for word_i in generated_targets['affinity']]
 
-	with open(base_target_path + '/' + '.'.join(image_name.split('.')[:-1]) + '.json', 'w') as f:
+	with open(base_target_path + '/' + image_name + '.json', 'w') as f:
 		json.dump(generated_targets, f)
 
 	return f_score
 
 
-def synthesize_with_score(dataloader, model, base_target_path, iteration):
+def synthesize_with_score(dataloader, model, base_target_path):
 
 	"""
 	Given a path to a set of images(icdar 2013 dataset), and path to a pre-trained model, generate the character heatmap
@@ -251,7 +251,6 @@ def synthesize_with_score(dataloader, model, base_target_path, iteration):
 	:param dataloader: dataloader for icdar 2013 dataset
 	:param model: pre-trained model
 	:param base_target_path: path where to store the predictions
-	:param iteration: current iteration number for weak-supervision
 	:return:
 	"""
 
@@ -287,10 +286,19 @@ def synthesize_with_score(dataloader, model, base_target_path, iteration):
 
 			for i in range(output.shape[0]):
 
-				# --------- Resizing it back to the original image size and saving it ----------- #
+				f_score.append(
+					generate_next_targets(
+						original_dim[i],
+						output[i],
+						image[i],
+						base_target_path,
+						image_name[i],
+						annots[i],
+						dataloader,
+					)
+				)
 
-				f_score.append(generate_next_targets(
-					original_dim[i], output[i], image[i], base_target_path, image_name[i], annots[i], dataloader, iteration))
+				# --------- Resizing it back to the original image size and saving it ----------- #
 
 			mean_f_score.append(np.mean(f_score))
 
@@ -361,9 +369,9 @@ def main(
 	synthesize(infer_dataloader, model, base_path_affinity, base_path_character, base_path_bbox)
 
 
-def generator_(base_target_path, iteration, model_path=None, model=None):
+def generator_(base_target_path, model_path=None, model=None):
 
-	from train_weak_supervision.dataloader import DataLoaderEvalICDAR2013
+	from train_weak_supervision.dataloader import DataLoaderEvalOther
 
 	"""
 	Generator function to generate weighted heat-maps for weak-supervision training
@@ -391,7 +399,7 @@ def generator_(base_target_path, iteration, model_path=None, model=None):
 
 	# Dataloader to pre-process images given in the dataset and provide annotations to generate weight
 
-	infer_dataloader = DataLoaderEvalICDAR2013('train')
+	infer_dataloader = DataLoaderEvalOther('train')
 
 	infer_dataloader = DataLoader(
 		infer_dataloader, batch_size=config.batch_size['test'],
@@ -416,4 +424,4 @@ def generator_(base_target_path, iteration, model_path=None, model=None):
 		saved_model = torch.load(model_path)
 		model.load_state_dict(saved_model['state_dict'])
 
-	synthesize_with_score(infer_dataloader, model, base_target_path, iteration)
+	synthesize_with_score(infer_dataloader, model, base_target_path)
