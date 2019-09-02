@@ -43,7 +43,7 @@ def train_synth():
 def test_synth(model):
 
 	"""
-	Training, Synthesizing, Testing using strong supervision on Synth-Text dataset
+	Testing using strong supervision on Synth-Text dataset
 	:param model: Path to trained model
 	:return: None
 	"""

@@ -58,11 +58,11 @@ Download the pre-trained model on Synthetic dataset at https://drive.google.com/
 <br> Otherwise if you want to train from scratch
 <br> Run the command - 
     
-    python main.py train_synth --mode train
+    python main.py train_synth
     
 <br> To test your model on SynthText, Run the command -
     
-    python main.py train_synth --mode test --model /path/to/model
+    python main.py test_synth --model /path/to/model
     
 ### Weak Supervision
 
@@ -106,6 +106,10 @@ To generate the json files for IC13 -
 			'target_folder_path': None,  --> path to where you downloaded the train gt (Challenge2_Test_Task1_GT)
 		}
 		
+	Run the command - 
+	
+	python main.py pre_process --dataset IC13
+		
 To generate the json files for IC15 - 
 
     In config.py change the corresponding values
@@ -119,6 +123,8 @@ To generate the json files for IC15 -
 			'target_json_path': None,  --> path to where you want the target json file (Images/test_gt.json)
 			'target_folder_path': None,  --> path to where you downloaded the train gt (Challenge4_Test_Task1_GT)
 		}
+		
+	python main.py pre_process --dataset IC15
 
 #### Second Train your model based on weak-supervision
 
