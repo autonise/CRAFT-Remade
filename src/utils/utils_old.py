@@ -287,3 +287,54 @@
 # 				cropped_weak_supervision_affinity[None, None]), (config.image_size[1], config.image_size[0]), mode='bilinear', align_corners=True).numpy()[0, 0]
 #
 # 	return [image, weight_character, weight_affinity, weak_supervision_char, weak_supervision_affinity]
+
+
+# try:
+
+# if not Polygon(bbox.reshape([4, 2]).astype(np.int32)).is_valid:
+# 	return image, weight_map
+#
+# top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
+# if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
+# 	return image, weight_map
+# bbox -= top_left[None, :]
+
+# start_row = max(top_left[1], 0) - top_left[1]
+# start_col = max(top_left[0], 0) - top_left[0]
+# end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
+# end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
+# image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+# 	transformed[
+# 	start_row:end_row - top_left[1],
+# 	start_col:end_col - top_left[0]]
+
+# weight_map[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+# 	np.float32(transformed[
+# 		start_row:end_row - top_left[1],
+# 		start_col:end_col - top_left[0]] != 0)*weight_val
+
+
+# backup = image.copy()
+
+# try:
+
+# start_row = max(top_left[1], 0) - top_left[1]
+# start_col = max(top_left[0], 0) - top_left[0]
+# end_row = min(top_left[1] + transformed.shape[0], image.shape[0])
+# end_col = min(top_left[0] + transformed.shape[1], image.shape[1])
+
+# image[max(top_left[1], 0):end_row, max(top_left[0], 0):end_col] += \
+# 	transformed[
+# 	start_row:end_row - top_left[1],
+# 	start_col:end_col - top_left[0]]
+
+
+# top_left = np.array([np.min(bbox[:, 0]), np.min(bbox[:, 1])]).astype(np.int32)
+# top_right = np.array([np.max(bbox[:, 0]), np.max(bbox[:, 1])]).astype(np.int32)
+#
+# if top_right[1] < 0 or top_right[0] < 0:
+# 	return image
+# if top_left[1] > image.shape[0] or top_left[0] > image.shape[1]:
+# 	return image
+#
+# bbox -= top_left[None, :]

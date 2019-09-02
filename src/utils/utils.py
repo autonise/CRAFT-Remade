@@ -18,11 +18,11 @@ def resize_bbox(original_dim, output, config):
 
 	character_bbox = cv2.resize(
 		output[0, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-		(original_dim[1], original_dim[0])) / 255
+		(original_dim[1]//2, original_dim[0]//2)) / 255
 
 	affinity_bbox = cv2.resize(
 		output[1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-		(original_dim[1], original_dim[0])) / 255
+		(original_dim[1]//2, original_dim[0]//2)) / 255
 
 	generated_targets = generate_word_bbox(
 		character_bbox,
@@ -30,6 +30,10 @@ def resize_bbox(original_dim, output, config):
 		character_threshold=config.threshold_character,
 		affinity_threshold=config.threshold_affinity,
 		word_threshold=config.threshold_word)
+
+	generated_targets['word_bbox'] = generated_targets['word_bbox']*2
+	generated_targets['characters'] = [i*2 for i in generated_targets['characters']]
+	generated_targets['affinity'] = [i*2 for i in generated_targets['affinity']]
 
 	return generated_targets
 
@@ -67,16 +71,27 @@ def cutter(word_bbox, num_characters):
 		numpy array containing affinity between characters, dtype = np.float32, shape = [num_characters, 4, 1, 2],
 	"""
 
+	# ToDo - Check if the cutter function works correctly after making the changes for handling quadrilateral bbox
+
 	x = [np.sqrt(np.sum(np.square(word_bbox[i, 0, :] - word_bbox[(i+1) % 4, 0, :]))) for i in range(4)]
 
 	width1_0 = np.argmax(x)
+
+	if width1_0 == 0:
+		return np.zeros([0, 4, 1, 2], dtype=np.int64), np.zeros([0, 4, 1, 2], dtype=np.int64)
+
 	width1_1 = (width1_0 + 1) % 4
 	width2_0 = (width1_0 + 3) % 4
+	width2_1 = (width1_0 + 2) % 4
 
-	width = x[width1_0]
+	width_0 = x[width1_0]
+	width_1 = x[width1_0]
 
-	direction = (word_bbox[width1_1, 0] - word_bbox[width1_0, 0])/width
-	character_width = width/num_characters
+	direction_0 = (word_bbox[width1_1, 0] - word_bbox[width1_0, 0])/width_0
+	direction_1 = (word_bbox[width2_1, 0] - word_bbox[width2_0, 0])/width_1
+
+	character_width_0 = width_0/num_characters
+	character_width_1 = width_1/num_characters
 
 	char_bbox = np.zeros([num_characters, 4, 1, 2], dtype=np.int64)
 	affinity_bbox = np.zeros([num_characters - 1, 4, 1, 2], dtype=np.int64)
@@ -87,8 +102,8 @@ def cutter(word_bbox, num_characters):
 
 	for i in range(1, num_characters + 1):
 
-		co_ordinates[i, 0] = co_ordinates[i - 1, 0] + direction*character_width
-		co_ordinates[i, 1] = co_ordinates[i - 1, 1] + direction*character_width
+		co_ordinates[i, 0] = co_ordinates[i - 1, 0] + direction_0*character_width_0
+		co_ordinates[i, 1] = co_ordinates[i - 1, 1] + direction_1*character_width_1
 
 		char_bbox[i-1, 0, 0] = co_ordinates[i - 1, 0]
 		char_bbox[i-1, 1, 0] = co_ordinates[i, 0]
@@ -166,16 +181,19 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 				found_no = no
 				break
 
-		if original_annotation['text'][orig_no] == unknown_symbol:
+		if original_annotation['text'][orig_no] == unknown_symbol or len(original_annotation['text'][orig_no]) == 0:
+
 			"""
 				If the current original annotation was predicted by the model but the text-annotation is not present 
 				then we create character bbox using predictions and give a weight of 0.5 to the word-bbox
 			"""
 
-			# ToDo - Here generating the cut instead of making it zero otherwise do not care would be treated as background
-			#   Make changes in the code to take care of this
+			# ToDo - Here generating the cut instead of making it zero otherwise do not care would be
+			#  treated as background Make changes in the code to take care of this
 
-			characters, affinity = cutter(orig_annot, len(original_annotation['text'][orig_no]))
+			# Some annotation in 2017 has length of word == 0. Hence adding max
+
+			characters, affinity = cutter(orig_annot, max(1, len(original_annotation['text'][orig_no])))
 
 			aligned_generated_targets['characters'][orig_no] = characters
 			aligned_generated_targets['affinity'][orig_no] = affinity
@@ -206,12 +224,14 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 			weight = weighing_function(len(original_annotation['text'][orig_no]), len(generated_targets['characters'][found_no]))
 
 			if weight <= weight_threshold:
+
 				characters, affinity = cutter(orig_annot, len(original_annotation['text'][orig_no]))
 
 				aligned_generated_targets['characters'][orig_no] = characters
 				aligned_generated_targets['affinity'][orig_no] = affinity
 				aligned_generated_targets['weights'][orig_no] = 0.5
 			else:
+
 				aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
 				aligned_generated_targets['affinity'][orig_no] = generated_targets['affinity'][found_no]
 				aligned_generated_targets['weights'][orig_no] = weight
@@ -220,7 +240,7 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 
 def generate_word_bbox(
-		character_heatmap, affinity_heatmap, character_threshold, affinity_threshold, word_threshold, spread=3):
+		character_heatmap, affinity_heatmap, character_threshold, affinity_threshold, word_threshold):
 
 	"""
 	Given the character heatmap, affinity heatmap, character and affinity threshold this function generates
@@ -231,7 +251,6 @@ def generate_word_bbox(
 	:param character_threshold: Threshold above which we say pixel belongs to a character
 	:param affinity_threshold: Threshold above which we say a pixel belongs to a affinity
 	:param word_threshold: Threshold of any pixel above which we say a group of characters for a word
-	:param spread: the spread of the gaussian heatmap being generated
 	:return: {
 		'word_bbox': word_bbox, type=np.array, dtype=np.int64, shape=[num_words, 4, 1, 2] ,
 		'characters': char_bbox, type=list of np.array, dtype=np.int64, shape=[num_words, num_characters, 4, 1, 2] ,
@@ -239,8 +258,6 @@ def generate_word_bbox(
 	}
 	"""
 
-	character_heatmap = character_heatmap.copy()
-	affinity_heatmap = affinity_heatmap.copy()
 	img_h, img_w = character_heatmap.shape
 
 	""" labeling method """
@@ -256,86 +273,78 @@ def generate_word_bbox(
 	det = []
 	mapper = []
 	for k in range(1, n_labels):
-		# size filtering
-		size = stats[k, cv2.CC_STAT_AREA]
-		if size < 10:
+
+		try:
+			# size filtering
+			size = stats[k, cv2.CC_STAT_AREA]
+			if size < 10:
+				continue
+
+			where = labels == k
+
+			# thresholding
+			if np.max(character_heatmap[where]) < word_threshold:
+				continue
+
+			# make segmentation map
+			seg_map = np.zeros(character_heatmap.shape, dtype=np.uint8)
+			seg_map[where] = 255
+			seg_map[np.logical_and(link_score == 1, text_score == 0)] = 0  # remove link area
+
+			x, y = stats[k, cv2.CC_STAT_LEFT], stats[k, cv2.CC_STAT_TOP]
+			w, h = stats[k, cv2.CC_STAT_WIDTH], stats[k, cv2.CC_STAT_HEIGHT]
+			niter = int(math.sqrt(size * min(w, h) / (w * h)) * 2)
+			sx, ex, sy, ey = x - niter, x + w + niter + 1, y - niter, y + h + niter + 1
+			# boundary check
+			if sx < 0:
+				sx = 0
+			if sy < 0:
+				sy = 0
+			if ex >= img_w:
+				ex = img_w
+			if ey >= img_h:
+				ey = img_h
+			kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1 + niter, 1 + niter))
+			seg_map[sy:ey, sx:ex] = cv2.dilate(seg_map[sy:ey, sx:ex], kernel)
+
+			# make box
+			np_contours = np.roll(np.array(np.where(seg_map != 0)), 1, axis=0).transpose().reshape(-1, 2)
+			rectangle = cv2.minAreaRect(np_contours)
+			box = cv2.boxPoints(rectangle)
+
+			# align diamond-shape
+			w, h = np.linalg.norm(box[0] - box[1]), np.linalg.norm(box[1] - box[2])
+			box_ratio = max(w, h) / (min(w, h) + 1e-5)
+			if abs(1 - box_ratio) <= 0.1:
+				l, r = min(np_contours[:, 0]), max(np_contours[:, 0])
+				t, b = min(np_contours[:, 1]), max(np_contours[:, 1])
+				box = np.array([[l, t], [r, t], [r, b], [l, b]], dtype=np.float32)
+
+			# make clock-wise order
+			start_idx = box.sum(axis=1).argmin()
+			box = np.roll(box, 4 - start_idx, 0)
+			box = np.array(box)
+
+			det.append(box)
+			mapper.append(k)
+
+		except:
+			# ToDo - Understand why there is a ValueError: math domain error in line
+			#  niter = int(math.sqrt(size * min(w, h) / (w * h)) * 2)
+
 			continue
-
-		where = labels == k
-
-		# thresholding
-		if np.max(character_heatmap[where]) < word_threshold:
-			continue
-
-		# make segmentation map
-		seg_map = np.zeros(character_heatmap.shape, dtype=np.uint8)
-		seg_map[where] = 255
-		seg_map[np.logical_and(link_score == 1, text_score == 0)] = 0  # remove link area
-
-		x, y = stats[k, cv2.CC_STAT_LEFT], stats[k, cv2.CC_STAT_TOP]
-		w, h = stats[k, cv2.CC_STAT_WIDTH], stats[k, cv2.CC_STAT_HEIGHT]
-		niter = int(math.sqrt(size * min(w, h) / (w * h)) * 2)
-		sx, ex, sy, ey = x - niter, x + w + niter + 1, y - niter, y + h + niter + 1
-		# boundary check
-		if sx < 0:
-			sx = 0
-		if sy < 0:
-			sy = 0
-		if ex >= img_w:
-			ex = img_w
-		if ey >= img_h:
-			ey = img_h
-		kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1 + niter, 1 + niter))
-		seg_map[sy:ey, sx:ex] = cv2.dilate(seg_map[sy:ey, sx:ex], kernel)
-
-		# make box
-		np_contours = np.roll(np.array(np.where(seg_map != 0)), 1, axis=0).transpose().reshape(-1, 2)
-		rectangle = cv2.minAreaRect(np_contours)
-		box = cv2.boxPoints(rectangle)
-
-		# align diamond-shape
-		w, h = np.linalg.norm(box[0] - box[1]), np.linalg.norm(box[1] - box[2])
-		box_ratio = max(w, h) / (min(w, h) + 1e-5)
-		if abs(1 - box_ratio) <= 0.1:
-			l, r = min(np_contours[:, 0]), max(np_contours[:, 0])
-			t, b = min(np_contours[:, 1]), max(np_contours[:, 1])
-			box = np.array([[l, t], [r, t], [r, b], [l, b]], dtype=np.float32)
-
-		# make clock-wise order
-		start_idx = box.sum(axis=1).argmin()
-		box = np.roll(box, 4 - start_idx, 0)
-		box = np.array(box)
-
-		det.append(box)
-		mapper.append(k)
 
 	char_contours, _ = cv2.findContours(text_score.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 	affinity_contours, _ = cv2.findContours(link_score.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
 	char_contours = link_to_word_bbox(char_contours, det)
 	affinity_contours = link_to_word_bbox(affinity_contours, det)
-	char_contours = expand_gaussian(char_contours, spread, character_threshold)
-	affinity_contours = expand_gaussian(affinity_contours, spread, affinity_threshold)
 
 	return {
 		'word_bbox': np.array(det, dtype=np.int32).reshape([len(det), 4, 1, 2]),
 		'characters': char_contours,
 		'affinity': affinity_contours,
 	}
-
-
-def expand_gaussian(contours, spread, threshold):
-
-	ratio = spread / 2 / np.sqrt(2 * np.log(1 / threshold))
-
-	expanded_contours = []
-	for word_i in contours:
-		center = np.mean(word_i, axis=1, keepdims=True)
-		centered_contours = word_i - center
-		centered_contours *= ratio
-		expanded_contours.append(centered_contours + center)
-
-	return expanded_contours
 
 
 def link_to_word_bbox(to_find, word_bbox):
@@ -352,7 +361,7 @@ def link_to_word_bbox(to_find, word_bbox):
 			continue
 		ratio = np.zeros([len(word_bbox)])
 		for word_i, word in enumerate(word_bbox):
-			b = Polygon(word.reshape([word.shape[0], 2]))
+			b = Polygon(word.reshape([word.shape[0], 2])).buffer(0)
 			ratio[word_i] = a.intersection(b).area/a.area
 
 		rectangle = cv2.minAreaRect(cont)
@@ -414,8 +423,8 @@ def calc_iou(poly1, poly2):
 	:return: float representing the IOU
 	"""
 
-	a = Polygon(poly1.reshape([poly1.shape[0], 2]))
-	b = Polygon(poly2.reshape([poly2.shape[0], 2]))
+	a = Polygon(poly1.reshape([poly1.shape[0], 2])).buffer(0)
+	b = Polygon(poly2.reshape([poly2.shape[0], 2])).buffer(0)
 
 	union_area = a.union(b).area
 
@@ -431,15 +440,24 @@ def calculate_fscore(pred, target, text_target, unknown='###', text_pred=None, t
 
 	:param pred: numpy array with shape [num_words, 4, 2]
 	:param target: numpy array with shape [num_words, 4, 2]
-	:param text_target: target text (Not useful in CRAFT implementation)
+	:param text_target: list of the target text
 	:param unknown: do not care text bbox
 	:param text_pred: predicted text (Not useful in CRAFT implementation)
 	:param threshold: overlap iou threshold over which we say the pair is positive
 	:return:
 	"""
 
+	assert len(text_target) == target.shape[0], 'Some error in text target'
+
 	if pred.shape[0] == target.shape[0] == 0:
-		return 1
+		return {
+			'f_score': 1,
+			'precision': 1,
+			'recall': 1,
+			'false_positive': 0,
+			'true_positive': 0,
+			'num_positive': 0
+		}
 
 	if text_pred is None:
 		check_text = False
@@ -477,17 +495,32 @@ def calculate_fscore(pred, target, text_target, unknown='###', text_pred=None, t
 	else:
 		true_positive = np.sum(already_done.astype(np.float32))
 
+	if text_target is not None:
+		num_positive = (np.where(np.array(text_target) != unknown)[0]).shape[0]
+	else:
+		num_positive = len(target)
+
 	if true_positive == 0:
-		return 0
+		return {
+			'f_score': 0,
+			'precision': 0,
+			'recall': 0,
+			'false_positive': false_positive,
+			'true_positive': true_positive,
+			'num_positive': num_positive
+		}
 
 	precision = true_positive/(true_positive + false_positive)
+	recall = true_positive / num_positive
 
-	if text_target is not None:
-		recall = true_positive/((np.where(np.array(text_target) != unknown)[0]).shape[0])
-	else:
-		recall = true_positive / len(target)
-
-	return 2*precision*recall/(precision + recall)
+	return {
+		'f_score': 2*precision*recall/(precision + recall),
+		'precision': precision,
+		'recall': recall,
+		'false_positive': false_positive,
+		'true_positive': true_positive,
+		'num_positive': num_positive
+	}
 
 
 def calculate_batch_fscore(pred, target, text_target, unknown='###', text_pred=None, threshold=0.5):
@@ -505,15 +538,25 @@ def calculate_batch_fscore(pred, target, text_target, unknown='###', text_pred=N
 	:return:
 	"""
 	if text_target is None:
-		text_target = [None for _ in range(len(pred))]
+		text_target = [''.join(['_' for __ in range(len(target[_]))]) for _ in range(len(pred))]
+
 	f_score = 0
+	precision = 0
+	recall = 0
+
 	for i in range(len(pred)):
 		if text_pred is not None:
-			f_score += calculate_fscore(pred[i], target[i], text_target[i], unknown, text_pred[i], threshold)
+			stats = calculate_fscore(pred[i], target[i], text_target[i], unknown, text_pred[i], threshold)
+			f_score += stats['f_score']
+			precision += stats['precision']
+			recall += stats['recall']
 		else:
-			f_score += calculate_fscore(pred[i], target[i], text_target[i], unknown, threshold=threshold)
+			stats = calculate_fscore(pred[i], target[i], text_target[i], unknown, threshold=threshold)
+			f_score += stats['f_score']
+			precision += stats['precision']
+			recall += stats['recall']
 
-	return f_score/len(pred)
+	return f_score/len(pred), precision/len(pred), recall/len(pred)
 
 
 def get_smooth_polygon(word_contours):
