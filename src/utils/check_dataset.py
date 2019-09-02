@@ -1,7 +1,6 @@
 import json
 import numpy as np
 import cv2
-import math
 
 base_path = '/home/SharedData/Mayank/ICDAR2015/Images/train_gt.json'
 

@@ -1,4 +1,4 @@
-from train_weak_supervision.dataloader import DataLoaderMIX, DataLoaderEvalICDAR2013
+from train_weak_supervision.dataloader import DataLoaderMIX, DataLoaderEvalOther
 import train_weak_supervision.config as config
 from src.generic_model import Criterian
 from src.utils.parallel import DataParallelCriterion
@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import os
+# import cv2
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
@@ -72,7 +73,8 @@ def train(model, optimizer, iteration):
 	change_lr()
 
 	dataloader = DataLoader(
-		DataLoaderMIX('train', iteration), batch_size=config.batch_size['train'], num_workers=0, shuffle=True)
+		DataLoaderMIX(
+			'train', iteration), batch_size=config.batch_size['train'], num_workers=config.num_workers['train'], shuffle=True)
 	loss_criterian = DataParallelCriterion(Criterian())
 
 	model.train()
@@ -80,7 +82,9 @@ def train(model, optimizer, iteration):
 	iterator = tqdm(dataloader)
 
 	all_loss = []
-	all_accuracy = []
+	all_precision = []
+	all_f_score = []
+	all_recall = []
 	all_count = []
 
 	for no, (
@@ -117,62 +121,76 @@ def train(model, optimizer, iteration):
 
 		# ---------- Calculating the F-score ------------ #
 
-		if type(output) == list:
-			output = torch.cat(output, dim=0)
+		if (no + 1) % config.check_iterations == 0:
 
-		output[output < 0] = 0
-		output[output > 1] = 1
+			if type(output) == list:
+				output = torch.cat(output, dim=0)
 
-		target_ic13 = []
-		predicted_ic13 = []
-		target_text = []
-		current_count = 0
-
-		if no % config.check_iterations == 0:
+			output[output < 0] = 0
+			output[output > 1] = 1
 
 			save(no, dataset_name, output, image, character_map, affinity_map, character_weight, affinity_weight)
 
-		output = output.data.cpu().numpy()
-		original_dim = original_dim.numpy()
+		if (no + 1) % config.calc_f_score == 0:
 
-		for __, _ in enumerate(dataset_name):
+			if type(output) == list:
+				output = torch.cat(output, dim=0)
 
-			if _ != 'SYNTH':
+			target_ic13 = []
+			predicted_ic13 = []
+			target_text = []
+			current_count = 0
 
-				predicted_ic13.append(resize_bbox(original_dim[__], output[__], config)['word_bbox'])
-				target_ic13.append(np.array(dataloader.dataset.gt[item[__]][1]['word_bbox'].copy(), dtype=np.int32))
-				target_text.append(text_target[__].split('~'))
+			output = output.data.cpu().numpy()
+			original_dim = original_dim.numpy()
 
-				current_count += 1
+			for __, _ in enumerate(dataset_name):
 
-		if len(predicted_ic13) != 0:
+				if _ != 'SYNTH':
 
-			all_accuracy.append(
-				calculate_batch_fscore(
-					predicted_ic13,
-					target_ic13,
-					text_target=target_text,
-					threshold=config.threshold_fscore)*current_count
-			)
+					predicted_ic13.append(resize_bbox(original_dim[__], output[__], config)['word_bbox'])
+					target_ic13.append(np.array(dataloader.dataset.gt[item[__]][1]['word_bbox'].copy(), dtype=np.int32))
+					target_text.append(text_target[__].split('#@#@#@'))
 
-			all_count.append(current_count)
+					current_count += 1
+
+			if len(predicted_ic13) != 0:
+
+				f_score, precision, recall = calculate_batch_fscore(
+						predicted_ic13,
+						target_ic13,
+						text_target=target_text,
+						threshold=config.threshold_fscore)
+
+				all_f_score.append(f_score*current_count)
+				all_precision.append(precision*current_count)
+				all_recall.append(recall*current_count)
+
+				all_count.append(current_count)
 
 		# ------------- Setting Description ---------------- #
 
-		if np.array(all_count)[-min(1000, len(all_count)):].sum() != 0:
+		if np.array(all_count)[-min(100, len(all_count)):].sum() != 0:
 
-			f_score = int(
-						np.array(all_accuracy)[-min(1000, len(all_accuracy)):].sum() * 100000000 /
-						np.array(all_count)[-min(1000, len(all_count)):].sum()) / 100000000
+			count = np.array(all_count)[-min(100, len(all_count)):].sum()
+
+			f_score = int(np.array(all_f_score)[-min(100, len(all_f_score)):].sum() * 10000 / count) / 10000
+			precision = int(np.array(all_precision)[-min(100, len(all_precision)):].sum() * 10000 / count) / 10000
+			recall = int(np.array(all_recall)[-min(100, len(all_recall)):].sum() * 10000 / count) / 10000
 		else:
+
 			f_score = 0
+			precision = 0
+			recall = 0
 
 		iterator.set_description(
 			'Loss:' + str(int(loss.item() * config.optimizer_iterations * 100000) / 100000) + ' Iterations:[' + str(no)
 			+ '/' + str(len(iterator)) +
 			'] Average Loss:' + str(
 				int(np.array(all_loss)[-min(1000, len(all_loss)):].mean() * 100000) / 100000) +
-			'| Average F-Score: ' + str(f_score)
+			'| Average F-Score: ' + str(f_score) +
+			'| Average Recall: ' + str(recall) +
+			'| Average Precision: ' + str(precision)
 		)
 
 	if len(iterator) % config.optimizer_iterations != 0:
@@ -182,7 +200,7 @@ def train(model, optimizer, iteration):
 
 	torch.cuda.empty_cache()
 
-	return model, optimizer, all_loss, all_accuracy
+	return model, optimizer, all_loss, all_f_score
 
 
 def test(model):
@@ -194,9 +212,18 @@ def test(model):
 	"""
 
 	dataloader = DataLoader(
-		DataLoaderEvalICDAR2013('test'), batch_size=config.batch_size['train'], num_workers=8, shuffle=False)
+		DataLoaderEvalOther('test'),
+		batch_size=config.batch_size['test'],
+		num_workers=config.num_workers['test'],
+		shuffle=False
+	)
+
+	true_positive = 0
+	false_positive = 0
+	num_positive = 0
 
 	with torch.no_grad():
+
 		model.eval()
 		iterator = tqdm(dataloader)
 		all_accuracy = []
@@ -225,21 +252,58 @@ def test(model):
 			f_score = []
 
 			for i in range(output.shape[0]):
+
+				# ToDo - Visualise the test results
+				# ToDo - Why is F-score of testing always less than F-score of training at iteration 0?
+
 				# --------- Resizing it back to the original image size and saving it ----------- #
 
-				f_score.append(
-					calculate_fscore(
+				# cur_image = denormalize_mean_variance(image[i].data.cpu().numpy().transpose(1, 2, 0))
+				#
+				# max_dim = original_dim[i].max()
+				# resizing_factor = 768 / max_dim
+				# before_pad_dim = [int(original_dim[i][0] * resizing_factor), int(original_dim[i][1] * resizing_factor)]
+				#
+				# height_pad = (768 - before_pad_dim[0]) // 2
+				# width_pad = (768 - before_pad_dim[1]) // 2
+				#
+				# cur_image_backup = cv2.resize(
+				# 	cur_image[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+				# 	(original_dim[i][1], original_dim[i][0]))
+				#
+				# cur_image = cur_image_backup.copy()
+				#
+				# cv2.drawContours(cur_image, resize_bbox(original_dim[i], output[i], config)['word_bbox'], -1, (0, 255, 0), 2)
+				# plt.imsave(str(i)+'_predicted.png', cur_image.astype(np.uint8))
+				#
+				# cur_image = cur_image_backup.copy()
+				# cv2.drawContours(cur_image, np.array(annots[i]['bbox']), -1, (0, 255, 0), 2)
+				# plt.imsave(str(i) + '_target.png', cur_image.astype(np.uint8))
+
+				score_calc = calculate_fscore(
 						resize_bbox(original_dim[i], output[i], config)['word_bbox'][:, :, 0, :],
 						np.array(annots[i]['bbox']),
 						text_target=annots[i]['text'],
 					)
+				f_score.append(
+					score_calc['f_score']
 				)
+				true_positive += score_calc['true_positive']
+				false_positive += score_calc['false_positive']
+				num_positive += score_calc['num_positive']
 
 				# --------------- PostProcessing for creating the targets for the next iteration ---------------- #
 
+			# exit(0)
+
 			all_accuracy.append(np.mean(f_score))
 
-			iterator.set_description('F-score: ' + str(np.mean(all_accuracy)))
+			precision = true_positive / (true_positive + false_positive)
+			recall = true_positive / num_positive
+
+			iterator.set_description(
+				'F-score: ' + str(np.mean(all_accuracy)) + '| Cumulative F-score: '
+				+ str(2*precision*recall/(precision + recall)))
 
 		torch.cuda.empty_cache()
 

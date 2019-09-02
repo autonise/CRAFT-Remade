@@ -56,7 +56,7 @@ def generate_target(model, iteration):
 	:return: None
 	"""
 
-	generator_(base_target_path=config.target_path + '/' + str(iteration), model=model, iteration=iteration)
+	generator_(base_target_path=config.target_path + '/' + str(iteration), model=model)
 	torch.cuda.empty_cache()
 
 

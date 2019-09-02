@@ -24,7 +24,9 @@ def init_weights(modules):
 class VGG16BN(torch.nn.Module):
 
     def __init__(self, pretrained=True, freeze=True):
+
         super(VGG16BN, self).__init__()
+
         model_urls['vgg16_bn'] = model_urls['vgg16_bn'].replace('https://', 'http://')
         vgg_pretrained_features = models.vgg16_bn(pretrained=pretrained).features
         self.slice1 = torch.nn.Sequential()
@@ -60,6 +62,7 @@ class VGG16BN(torch.nn.Module):
                 param.requires_grad = False
 
     def forward(self, x):
+
         h = self.slice1(x)
         h_relu2_2 = h
         h = self.slice2(h)
