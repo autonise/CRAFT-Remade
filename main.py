@@ -27,33 +27,29 @@ def main():
 
 
 @main.command()
-@click.option('-mode', '--mode', help='Train or Test or Synthesize', required=True)
-@click.option('-model', '--model', help='Path to Model for Testing', required=False)
-@click.option('-folder', '--folder', help='Path to Evaluation Folder', required=False)
-def train_synth(mode, model=None, folder=None):
+def train_synth():
 
 	"""
-	Training, Synthesizing, Testing using strong supervision on Synth-Text dataset
-	:param mode: 'train', 'test', 'synthesize'
-	:param model: Path to Model for Testing (only required if mode = 'test', 'synthesize'
-	:param folder: Path to folder to synthesize
+	Training using strong supervision on Synth-Text dataset
 	:return: None
 	"""
 
-	mode = mode.lower()
+	from train_synth import train
+	train.main()
 
-	if mode == 'train':
-		from train_synth import train
-		train.main()
 
-	elif mode == 'test':
-		from train_synth import test
-		if model is None:
-			print('Please Enter the model path')
-		else:
-			test.main(model)
-	else:
-		print('Invalid Mode')
+@main.command()
+@click.option('-model', '--model', help='Path to Model', required=True)
+def test_synth(model):
+
+	"""
+	Training, Synthesizing, Testing using strong supervision on Synth-Text dataset
+	:param model: Path to trained model
+	:return: None
+	"""
+
+	from train_synth import test
+	test.main(model)
 
 
 @main.command()
@@ -84,14 +80,18 @@ def weak_supervision(model, iterations):
 		4) Saving the final model	
 	"""
 
+	skip_iterations = [0]
+
 	for iteration in range(int(iterations)):
 
-		print('Generating for iteration:', iteration)
-		generate_target(model, iteration)
+		if iteration not in skip_iterations:
 
-		print('Testing for iteration:', iteration)
-		f_score_test = test(model)
-		print('Test Results for iteration:', iteration, ' | F-score: ', f_score_test)
+			print('Generating for iteration:', iteration)
+			generate_target(model, iteration)
+
+			print('Testing for iteration:', iteration)
+			f_score_test = test(model)
+			print('Test Results for iteration:', iteration, ' | F-score: ', f_score_test)
 
 		print('Fine-tuning for iteration:', iteration)
 		model, optimizer, loss, accuracy = train(model, optimizer, iteration)
@@ -145,10 +145,10 @@ def pre_process(dataset):
 		import config
 
 		if \
-				config.dataset_pre_process['ic13']['train']['target_json_path'] is None or \
-						config.dataset_pre_process['ic13']['train']['target_folder_path'] is None or \
-						config.dataset_pre_process['ic13']['test']['target_json_path'] is None or \
-						config.dataset_pre_process['ic13']['test']['target_folder_path'] is None:
+			config.dataset_pre_process['ic13']['train']['target_json_path'] is None or \
+			config.dataset_pre_process['ic13']['train']['target_folder_path'] is None or \
+			config.dataset_pre_process['ic13']['test']['target_json_path'] is None or \
+			config.dataset_pre_process['ic13']['test']['target_folder_path'] is None:
 			print(
 				'Change the config.py file. '
 				'Add the path to the output json file and the target folder path. Detailed instructions in ReadMe.md')
