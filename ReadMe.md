@@ -43,7 +43,7 @@ Put the images inside a folder.
 ### Strong Supervision
 
 SynthText(CRAFT Model) - https://drive.google.com/open?id=1QH0B-iQ1Ob2HkWCQ2bVCsLPwVSmbcSgN<br>
-SynthText(ResNet-UNet Model) - https://drive.google.com/file/d/1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T
+SynthText(ResNet-UNet Model) - https://drive.google.com/file/d/1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<br>
 Original Model by authors - https://drive.google.com/open?id=1ZQE0tK9498RhLcXwYRgod4upmrYWdgl9<br>
     
 ### Weak Supervision
