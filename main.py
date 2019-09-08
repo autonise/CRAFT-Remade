@@ -13,10 +13,12 @@ def seed(config=None):
 	if config is None:
 		import config
 
-	np.random.seed(config.seed)
-	random.seed(config.seed)
+	torch.cuda.manual_seed_all(config.seed)  # if you are using multi-GPU.
 	torch.manual_seed(config.seed)
 	torch.cuda.manual_seed(config.seed)
+	np.random.seed(config.seed)
+	random.seed(config.seed)
+	torch.backends.cudnn.benchmark = False
 	torch.backends.cudnn.deterministic = True
 
 
@@ -80,7 +82,7 @@ def weak_supervision(model, iterations):
 		4) Saving the final model	
 	"""
 
-	skip_iterations = [0]
+	skip_iterations = []
 
 	for iteration in range(int(iterations)):
 
@@ -116,20 +118,23 @@ def synthesize(model, folder):
 		print('Please Enter the path of the folder you want to generate the targets for')
 
 	else:
-		print('Will generate the predictions at: ', '/'.join(folder.split('/')[:-1])+'/target_affinity')
-		print('Will generate the predictions at: ', '/'.join(folder.split('/')[:-1])+'/target_character')
-		print('Will generate the predictions at: ', '/'.join(folder.split('/')[:-1]) + '/word_bbox')
-
-		os.makedirs('/'.join(folder.split('/')[:-1])+'/target_affinity', exist_ok=True)
-		os.makedirs('/'.join(folder.split('/')[:-1])+'/target_character', exist_ok=True)
-		os.makedirs('/'.join(folder.split('/')[:-1])+'/word_bbox', exist_ok=True)
+		print('Will generate the Affinity Heatmap at: ', '/'.join(folder.split('/')[:-1])+'/affinity_heatmap')
+		print('Will generate the Character Heatmap at: ', '/'.join(folder.split('/')[:-1]) + '/character_heatmap')
+		print('Will generate the Word Bbox at: ', '/'.join(folder.split('/')[:-1]) + '/word_bbox')
+		print('Will generate the Character Bbox at: ', '/'.join(folder.split('/')[:-1]) + '/character_bbox')
+		print('Will generate the Affinity Bbox at: ', '/'.join(folder.split('/')[:-1]) + '/affinity_bbox')
+		print('Will generate the json annotations at: ', '/'.join(folder.split('/')[:-1]) + '/json_annotations')
 
 		synthesize.main(
 			folder,
 			model_path=model,
-			base_path_character='/'.join(folder.split('/')[:-1])+'/target_character',
-			base_path_affinity='/'.join(folder.split('/')[:-1])+'/target_affinity',
-			base_path_bbox='/'.join(folder.split('/')[:-1])+'/word_bbox')
+			base_path_character='/'.join(folder.split('/')[:-1])+'/character_heatmap',
+			base_path_affinity='/'.join(folder.split('/')[:-1])+'/affinity_heatmap',
+			base_path_bbox='/'.join(folder.split('/')[:-1])+'/word_bbox',
+			base_path_char='/'.join(folder.split('/')[:-1])+'/character_bbox',
+			base_path_aff='/'.join(folder.split('/')[:-1])+'/affinity_bbox',
+			base_path_json='/'.join(folder.split('/')[:-1]) + '/json_annotations',
+		)
 
 
 @main.command()
