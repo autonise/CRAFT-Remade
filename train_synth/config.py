@@ -17,29 +17,29 @@ num_workers = {
 	'test': 16
 }
 
-pretrained = True
-pretrained_path = '/home/SharedData/Mayank/Models/SYNTH/63000_model.pkl'
+pretrained = False
+pretrained_path = '/home/SharedData/Mayank/Models/SYNTH/6000_model.pkl'
 pretrained_loss_plot_training = '/home/SharedData/Mayank/Models/SYNTH/loss_plot_training.npy'
+
+optimizer_iteration = 4//len(num_cuda.split(','))
 
 lr = {
 	1: 1e-4,
-	10000: 5e-5,
-	20000: 2e-5,
-	40000: 1e-5,
-	60000: 1e-6,
+	8000*optimizer_iteration: 5e-5,
+	16000*optimizer_iteration: 2e-5,
+	32000*optimizer_iteration: 1e-5,
+	48000*optimizer_iteration: 1e-6,
 }
 
-num_epochs_strong_supervision = 2
+num_epochs_strong_supervision = 1.2
 
-periodic_fscore = 300
-periodic_output = 3000
-periodic_save = 3000
-optimizer_iteration = 1
+periodic_fscore = 300*optimizer_iteration
+periodic_output = 3000*optimizer_iteration
+periodic_save = 3000*optimizer_iteration
 
-visualize_generated = False
+visualize_generated = True
+visualize_freq = 20
 
-weight_threshold = 0.5
+weight_threshold = 0.9
 
 model_architecture = 'craft'
-
-image_size = [1024, 1024]
