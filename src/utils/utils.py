@@ -5,6 +5,30 @@ from .data_manipulation import two_char_bbox_to_affinity
 import math
 
 
+def order_points(box):
+
+	x_sorted_arg = np.argsort(box[:, 0])
+	if box[x_sorted_arg[0], 1] > box[x_sorted_arg[1], 1]:
+		tl = x_sorted_arg[1]
+	else:
+		tl = x_sorted_arg[0]
+
+	ordered_bbox = np.array([box[(tl + i) % 4] for i in range(4)])
+
+	return ordered_bbox
+
+
+def _init_fn(worker_id):
+
+	"""
+	Function to make the pytorch dataloader deterministic
+	:param worker_id: id of the parallel worker
+	:return:
+	"""
+
+	np.random.seed(0 + worker_id)
+
+
 def resize_bbox(original_dim, output, config):
 
 	max_dim = original_dim.max()
@@ -29,7 +53,12 @@ def resize_bbox(original_dim, output, config):
 		affinity_bbox,
 		character_threshold=config.threshold_character,
 		affinity_threshold=config.threshold_affinity,
-		word_threshold=config.threshold_word)
+		word_threshold=config.threshold_word,
+		character_threshold_upper=config.threshold_character_upper,
+		affinity_threshold_upper=config.threshold_affinity_upper,
+		scaling_affinity=config.scale_affinity,
+		scaling_character=config.scale_character,
+	)
 
 	generated_targets['word_bbox'] = generated_targets['word_bbox']*2
 	generated_targets['characters'] = [i*2 for i in generated_targets['characters']]
@@ -56,6 +85,11 @@ def weighing_function(orig_length, cur_length):
 	:return:
 	"""
 
+	if orig_length == 0:
+		if cur_length == 0:
+			return 1
+		return 0
+
 	return (orig_length - min(orig_length, abs(orig_length - cur_length)))/orig_length
 
 
@@ -71,24 +105,33 @@ def cutter(word_bbox, num_characters):
 		numpy array containing affinity between characters, dtype = np.float32, shape = [num_characters, 4, 1, 2],
 	"""
 
-	# ToDo - Check if the cutter function works correctly after making the changes for handling quadrilateral bbox
-
-	x = [np.sqrt(np.sum(np.square(word_bbox[i, 0, :] - word_bbox[(i+1) % 4, 0, :]))) for i in range(4)]
-
-	width1_0 = np.argmax(x)
-
-	if width1_0 == 0:
+	if Polygon(word_bbox[:, 0, :]).area == 0:
 		return np.zeros([0, 4, 1, 2], dtype=np.int64), np.zeros([0, 4, 1, 2], dtype=np.int64)
 
-	width1_1 = (width1_0 + 1) % 4
-	width2_0 = (width1_0 + 3) % 4
-	width2_1 = (width1_0 + 2) % 4
+	word_bbox[:, 0, :] = order_points(word_bbox[:, 0, :])
 
-	width_0 = x[width1_0]
-	width_1 = x[width1_0]
+	edge_length = [np.sqrt(np.sum(np.square(word_bbox[i, 0, :] - word_bbox[(i+1) % 4, 0, :]))) for i in range(4)]
 
-	direction_0 = (word_bbox[width1_1, 0] - word_bbox[width1_0, 0])/width_0
-	direction_1 = (word_bbox[width2_1, 0] - word_bbox[width2_0, 0])/width_1
+	if edge_length[0]*2 < edge_length[1]:
+		tl, tr, br, bl = 1, 2, 3, 0
+	else:
+		tl, tr, br, bl = 0, 1, 2, 3
+
+	if edge_length[0] == 0:
+		return np.zeros([0, 4, 1, 2], dtype=np.int64), np.zeros([0, 4, 1, 2], dtype=np.int64)
+
+	width_0 = edge_length[tl]
+	width_1 = edge_length[tr]
+
+	if width_0 != 0:
+		direction_0 = (word_bbox[tr, 0] - word_bbox[tl, 0]) / width_0
+	else:
+		direction_0 = np.float32([0, 0])
+
+	if width_1 != 0:
+		direction_1 = (word_bbox[br, 0] - word_bbox[bl, 0])/width_1
+	else:
+		direction_1 = np.float32([0, 0])
 
 	character_width_0 = width_0/num_characters
 	character_width_1 = width_1/num_characters
@@ -97,8 +140,8 @@ def cutter(word_bbox, num_characters):
 	affinity_bbox = np.zeros([num_characters - 1, 4, 1, 2], dtype=np.int64)
 	co_ordinates = np.zeros([num_characters + 1, 2, 2], dtype=np.int64)
 
-	co_ordinates[0, 0] = word_bbox[width1_0, 0]
-	co_ordinates[0, 1] = word_bbox[width2_0, 0]
+	co_ordinates[0, 0] = word_bbox[tl, 0]
+	co_ordinates[0, 1] = word_bbox[bl, 0]
 
 	for i in range(1, num_characters + 1):
 
@@ -146,9 +189,10 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 							type = list of np.array, shape = [num_words, num_affinity_in_each_word, 4, 1, 2]
 			'text' : list of all annotated text present in original_annotation,
 							type = list, shape = [num_words]
-			'weights' : list of values between 0 and 1 denoting weight of that particular word-bbox in the loss while
+			'weights' : list containing list for character and affinity having values between 0 and 1 denoting weight
+						of that particular word-bbox for character and affinity respectively in the loss while
 						training weak-supervised model
-							type = list, shape = [num_words]
+							type = list, shape = [num_words, 2]
 		}
 	"""
 
@@ -176,6 +220,8 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 		for no, gen_t in enumerate(generated_targets['word_bbox']):
 
+			# ToDo - For ic13, as the bbox are always horizontal we should use better calc_iou
+
 			if calc_iou(np.array(gen_t), np.array(orig_annot)) > threshold:
 				# If IOU between predicted and original word-bbox is > threshold then it is termed positive
 				found_no = no
@@ -188,16 +234,13 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 				then we create character bbox using predictions and give a weight of 0.5 to the word-bbox
 			"""
 
-			# ToDo - Here generating the cut instead of making it zero otherwise do not care would be
-			#  treated as background Make changes in the code to take care of this
-
 			# Some annotation in 2017 has length of word == 0. Hence adding max
 
-			characters, affinity = cutter(orig_annot, max(1, len(original_annotation['text'][orig_no])))
+			assert np.all(np.array(orig_annot.shape) == np.array([4, 1, 2])), str(orig_annot.shape) + ' error in original annot'
 
-			aligned_generated_targets['characters'][orig_no] = characters
-			aligned_generated_targets['affinity'][orig_no] = affinity
-			aligned_generated_targets['weights'][orig_no] = 0
+			aligned_generated_targets['characters'][orig_no] = orig_annot[None]
+			aligned_generated_targets['affinity'][orig_no] = orig_annot[None]
+			aligned_generated_targets['weights'][orig_no] = [0, 0]
 
 		elif found_no == -1:
 
@@ -210,7 +253,7 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 
 			aligned_generated_targets['characters'][orig_no] = characters
 			aligned_generated_targets['affinity'][orig_no] = affinity
-			aligned_generated_targets['weights'][orig_no] = 0.5
+			aligned_generated_targets['weights'][orig_no] = [0.5, 0.5]
 
 		else:
 
@@ -221,26 +264,53 @@ def get_weighted_character_target(generated_targets, original_annotation, unknow
 				weighing_function to the word-bbox
 			"""
 
-			weight = weighing_function(len(original_annotation['text'][orig_no]), len(generated_targets['characters'][found_no]))
+			weight_char = weighing_function(
+				len(original_annotation['text'][orig_no]), len(generated_targets['characters'][found_no]))
+			weight_aff = weighing_function(
+				len(original_annotation['text'][orig_no])-1, len(generated_targets['affinity'][found_no]))
 
-			if weight <= weight_threshold:
+			applied_weight = [0, 0]
+
+			if weight_char <= weight_threshold:
 
 				characters, affinity = cutter(orig_annot, len(original_annotation['text'][orig_no]))
 
 				aligned_generated_targets['characters'][orig_no] = characters
-				aligned_generated_targets['affinity'][orig_no] = affinity
-				aligned_generated_targets['weights'][orig_no] = 0.5
+				applied_weight[0] = 0.5
+
 			else:
 
 				aligned_generated_targets['characters'][orig_no] = generated_targets['characters'][found_no]
+				applied_weight[0] = weight_char
+
+			if weight_aff <= weight_threshold:
+
+				characters, affinity = cutter(orig_annot, len(original_annotation['text'][orig_no]))
+
+				aligned_generated_targets['affinity'][orig_no] = affinity
+				applied_weight[1] = 0.5
+
+			else:
+
 				aligned_generated_targets['affinity'][orig_no] = generated_targets['affinity'][found_no]
-				aligned_generated_targets['weights'][orig_no] = weight
+				applied_weight[1] = weight_aff
+
+			aligned_generated_targets['weights'][orig_no] = applied_weight
 
 	return aligned_generated_targets
 
 
 def generate_word_bbox(
-		character_heatmap, affinity_heatmap, character_threshold, affinity_threshold, word_threshold):
+		character_heatmap,
+		affinity_heatmap,
+		character_threshold,
+		affinity_threshold,
+		word_threshold,
+		character_threshold_upper,
+		affinity_threshold_upper,
+		scaling_character,
+		scaling_affinity
+	):
 
 	"""
 	Given the character heatmap, affinity heatmap, character and affinity threshold this function generates
@@ -251,6 +321,10 @@ def generate_word_bbox(
 	:param character_threshold: Threshold above which we say pixel belongs to a character
 	:param affinity_threshold: Threshold above which we say a pixel belongs to a affinity
 	:param word_threshold: Threshold of any pixel above which we say a group of characters for a word
+	:param character_threshold_upper: Threshold above which we differentiate the characters
+	:param affinity_threshold_upper: Threshold above which we differentiate the affinity
+	:param scaling_character: how much to scale the character bbox
+	:param scaling_affinity: how much to scale the affinity bbox
 	:return: {
 		'word_bbox': word_bbox, type=np.array, dtype=np.int64, shape=[num_words, 4, 1, 2] ,
 		'characters': char_bbox, type=list of np.array, dtype=np.int64, shape=[num_words, num_characters, 4, 1, 2] ,
@@ -304,6 +378,7 @@ def generate_word_bbox(
 				ex = img_w
 			if ey >= img_h:
 				ey = img_h
+
 			kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1 + niter, 1 + niter))
 			seg_map[sy:ey, sx:ex] = cv2.dilate(seg_map[sy:ey, sx:ex], kernel)
 
@@ -311,6 +386,9 @@ def generate_word_bbox(
 			np_contours = np.roll(np.array(np.where(seg_map != 0)), 1, axis=0).transpose().reshape(-1, 2)
 			rectangle = cv2.minAreaRect(np_contours)
 			box = cv2.boxPoints(rectangle)
+
+			if Polygon(box).area == 0:
+				continue
 
 			# align diamond-shape
 			w, h = np.linalg.norm(box[0] - box[1]), np.linalg.norm(box[1] - box[2])
@@ -334,8 +412,14 @@ def generate_word_bbox(
 
 			continue
 
+	ret, text_score = cv2.threshold(character_heatmap, character_threshold_upper, 1, 0)
+	ret, link_score = cv2.threshold(affinity_heatmap, affinity_threshold_upper, 1, 0)
+
 	char_contours, _ = cv2.findContours(text_score.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 	affinity_contours, _ = cv2.findContours(link_score.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+	char_contours = scale_bbox(char_contours, scaling_character)
+	affinity_contours = scale_bbox(affinity_contours, scaling_affinity)
 
 	char_contours = link_to_word_bbox(char_contours, det)
 	affinity_contours = link_to_word_bbox(affinity_contours, det)
@@ -347,6 +431,17 @@ def generate_word_bbox(
 	}
 
 
+def scale_bbox(contours, scale):
+
+	mean = [np.array(i)[:, 0, :].mean(axis=0) for i in contours]
+	centered_contours = [np.array(contours[i]) - mean[i][None, None, :] for i in range(len(contours))]
+	scaled_contours = [centered_contours[i]*scale for i in range(len(centered_contours))]
+	shifted_back = [scaled_contours[i] + mean[i][None, None, :] for i in range(len(scaled_contours))]
+	shifted_back = [i.astype(np.int32) for i in shifted_back]
+
+	return shifted_back
+
+
 def link_to_word_bbox(to_find, word_bbox):
 
 	if len(word_bbox) == 0:
@@ -354,19 +449,32 @@ def link_to_word_bbox(to_find, word_bbox):
 	word_sorted_character = [[] for _ in word_bbox]
 
 	for cont_i, cont in enumerate(to_find):
+
 		if cont.shape[0] < 4:
 			continue
+
+		rectangle = cv2.minAreaRect(cont)
+		box = cv2.boxPoints(rectangle)
+
+		if Polygon(box).area == 0:
+			continue
+
+		ordered_bbox = order_points(box)
+
 		a = Polygon(cont.reshape([cont.shape[0], 2])).buffer(0)
+
 		if a.area == 0:
 			continue
+
 		ratio = np.zeros([len(word_bbox)])
+
+		# Polygon intersection usd for checking ratio
+
 		for word_i, word in enumerate(word_bbox):
 			b = Polygon(word.reshape([word.shape[0], 2])).buffer(0)
 			ratio[word_i] = a.intersection(b).area/a.area
 
-		rectangle = cv2.minAreaRect(cont)
-		box = cv2.boxPoints(rectangle)
-		word_sorted_character[np.argmax(ratio)].append(box)
+		word_sorted_character[np.argmax(ratio)].append(ordered_bbox)
 
 	word_sorted_character = [
 		np.array(word_i, dtype=np.int32).reshape([len(word_i), 4, 1, 2]) for word_i in word_sorted_character]
