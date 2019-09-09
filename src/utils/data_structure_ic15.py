@@ -42,7 +42,7 @@ def icdar2015_test(
 
 	for image_name in all_transcriptions:
 
-		i = 'gt_'+'.'.join(image_name.split('.')[:-1])+'.txt'
+		i = '.'.join(image_name.split('.')[:-1])+'.txt'
 		all_annots['annots'][image_name] = {}
 
 		cur_annot = []
@@ -100,7 +100,7 @@ def icdar2015_train(
 
 	for image_name in all_transcriptions:
 
-		i = 'gt_'+'.'.join(image_name.split('.')[:-1])+'.txt'
+		i = '.'.join(image_name.split('.')[:-1])+'.txt'
 		all_annots['annots'][image_name] = {}
 
 		cur_annot = []
