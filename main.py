@@ -1,5 +1,4 @@
 import click
-import os
 import torch
 import numpy as np
 import random
@@ -91,9 +90,13 @@ def weak_supervision(model, iterations):
 			print('Generating for iteration:', iteration)
 			generate_target(model, iteration)
 
+			# exit(0)
+
 			print('Testing for iteration:', iteration)
-			f_score_test = test(model)
+			f_score_test = test(model, iteration)
 			print('Test Results for iteration:', iteration, ' | F-score: ', f_score_test)
+
+			# exit(0)
 
 		print('Fine-tuning for iteration:', iteration)
 		model, optimizer, loss, accuracy = train(model, optimizer, iteration)

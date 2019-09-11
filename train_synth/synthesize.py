@@ -16,6 +16,25 @@ import matplotlib.pyplot as plt
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)  # Specify which GPU you want to use
 
 
+def get_next_estimated_word_bbox(characters, affinity):
+
+	image = np.zeros([4000, 4000], dtype=np.uint8)
+
+	all_contours = np.concatenate([np.concatenate(characters, axis=0), np.concatenate(affinity, axis=0)], axis=0)
+	cv2.drawContours(image, all_contours.astype(np.int32), -1, 255, cv2.FILLED)
+
+	all_word_bbox, _ = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+	all_word_rect = []
+
+	for i in all_word_bbox:
+		rectangle = cv2.minAreaRect(i)
+		box = cv2.boxPoints(rectangle)
+		all_word_rect.append(box)
+
+	return np.array(all_word_rect).astype(np.int64)
+
+
 def synthesize(
 		dataloader, model, base_path_affinity, base_path_character, base_path_bbox, base_path_char, base_path_aff, base_path_json):
 
@@ -224,8 +243,19 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 
 	target_word_bbox = generated_targets['word_bbox'].copy()
 
+	# x = get_next_estimated_word_bbox(generated_targets['characters'], generated_targets['affinity'])
+	#
+	# image_cont = np.zeros([np.max(target_word_bbox.reshape([-1, 2]), axis=0)[1] + 100, np.max(target_word_bbox.reshape([-1, 2]), axis=0)[0] + 100, 3], dtype=np.uint8)
+	#
+	# cv2.drawContours(image_cont, x.reshape([x.shape[0], 4, 1, 2]), -1, (0, 255, 0), 2)
+	# cv2.drawContours(image_cont, target_word_bbox, -1, (255, 0, 0), 2)
+	#
+	# plt.imsave('/home/SharedData/Mayank/'+str(no)+'_'+str(np.random.randint(1000))+'.png', image_cont)
+	# print('saved', no)
+
 	f_score = calculate_fscore(
 			predicted_word_bbox[:, :, 0, :],
+			# x,
 			target_word_bbox[:, :, 0, :],
 			text_target=annots['text'],
 			unknown=dataloader.dataset.gt['unknown']

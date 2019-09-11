@@ -1,6 +1,6 @@
 seed = 0
 
-dataset_name = 'ICDAR2015'
+dataset_name = 'ICDAR2013_ICDAR2017'
 test_dataset_name = 'ICDAR2015'
 
 DataLoaderSYNTH_base_path = '/home/SharedData/Mayank/SynthText/Images'
@@ -15,17 +15,11 @@ target_path = '/home/SharedData/Mayank/'+dataset_name+'/Generated'
 
 Test_Dataset_Path = '/home/SharedData/Mayank/'+test_dataset_name
 
-# threshold_character = 0.401288268
-# threshold_affinity = 0.457833362
+threshold_character = 0.401288268
+threshold_affinity = 0.457833362
 
-threshold_character = 0.4
-threshold_affinity = 0.4
-
-# threshold_character_upper = threshold_character + 0.2
-# threshold_affinity_upper = threshold_affinity + 0.2
-
-threshold_character_upper = 0.4
-threshold_affinity_upper = 0.4
+threshold_character_upper = threshold_character + 0.2
+threshold_affinity_upper = threshold_affinity + 0.2
 
 scale_character = 25/18.67
 scale_affinity = 25/18.3

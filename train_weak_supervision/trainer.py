@@ -2,16 +2,16 @@ from train_weak_supervision.dataloader import DataLoaderMIX, DataLoaderEvalOther
 import train_weak_supervision.config as config
 from src.generic_model import Criterian
 from src.utils.parallel import DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, calculate_fscore, resize_bbox
+from src.utils.utils import calculate_batch_fscore, calculate_fscore, resize_bbox, _init_fn
 from src.utils.data_manipulation import denormalize_mean_variance
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 import torch
 import os
-# import cv2
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
@@ -27,29 +27,40 @@ def save(no, dataset_name, output, image, character_map, affinity_map, character
 		plt.imsave('Temporary/'+str(no)+'/'+str(__)+'/image_.png', denormalize_mean_variance(
 			image[__].data.cpu().numpy().transpose(1, 2, 0)))
 
-		plt.imsave(
-			'Temporary/'+str(no)+'/'+str(__)+'/char_map.png', output[__, 0].data.cpu().numpy(),
-			cmap='gray')
+		cv2.imwrite('Temporary/'+str(no)+'/'+str(__)+'/char_map.png', np.uint8(output[__, 0].data.cpu().numpy()*255))
 
-		plt.imsave(
-			'Temporary/'+str(no)+'/'+str(__)+'/aff_map.png', output[__, 1].data.cpu().numpy(),
-			cmap='gray')
+		cv2.imwrite('Temporary/'+str(no)+'/'+str(__)+'/aff_map.png', np.uint8(output[__, 1].data.cpu().numpy()*255))
 
-		plt.imsave(
-			'Temporary/'+str(no)+'/'+str(__)+'/target_char_map.png', character_map[__].data.cpu().numpy(),
-			cmap='gray')
+		cv2.imwrite(
+			'Temporary/'+str(no)+'/'+str(__)+'/char_map_threshold.png',
+			np.uint8(np.float32(output[__, 0].data.cpu().numpy() > config.threshold_character_upper)*255))
 
-		plt.imsave(
-			'Temporary/'+str(no)+'/'+str(__)+'/target_affinity_map.png', affinity_map[__].data.cpu().numpy(),
-			cmap='gray')
+		cv2.imwrite(
+			'Temporary/'+str(no)+'/'+str(__)+'/aff_map_threshold.png',
+			np.uint8(np.float32(output[__, 1].data.cpu().numpy() > config.threshold_affinity_upper)*255))
 
-		plt.imsave(
-			'Temporary/'+str(no)+'/'+str(__)+'/weight_char_map.png', character_weight[__].data.cpu().numpy(),
-			cmap='gray')
+		cv2.imwrite(
+			'Temporary/'+str(no)+'/'+str(__)+'/target_char_map.png', np.uint8(character_map[__].data.cpu().numpy()*255))
 
-		plt.imsave(
-			'Temporary/'+str(no)+'/'+str(__)+'/weight_affinity_map.png', affinity_weight[__].data.cpu().numpy(),
-			cmap='gray')
+		cv2.imwrite(
+			'Temporary/'+str(no)+'/'+str(__)+'/target_affinity_map.png', np.uint8(affinity_map[__].data.cpu().numpy()*255))
+
+		cv2.imwrite(
+			'Temporary/'+str(no)+'/'+str(__)+'/weight_char_map.png', np.uint8(character_weight[__].data.cpu().numpy()*255))
+
+		cv2.imwrite(
+			'Temporary/'+str(no)+'/'+str(__)+'/weight_affinity_map.png', np.uint8(affinity_weight[__].data.cpu().numpy()*255))
+
+
+def change_lr(optimizer, lr):
+
+	# Change learning rate while training
+	for param_group in optimizer.param_groups:
+		param_group['lr'] = lr
+
+	print('Learning Rate Changed to ', lr)
+
+	return optimizer
 
 
 def train(model, optimizer, iteration):
@@ -62,19 +73,15 @@ def train(model, optimizer, iteration):
 	:return: model, optimizer
 	"""
 
-	def change_lr():
-
-		# Change learning rate while training
-		for param_group in optimizer.param_groups:
-			param_group['lr'] = config.lr[iteration]
-
-		print('Learning Rate Changed to ', config.lr[iteration])
-
-	change_lr()
+	optimizer = change_lr(optimizer, config.lr[iteration])
 
 	dataloader = DataLoader(
-		DataLoaderMIX(
-			'train', iteration), batch_size=config.batch_size['train'], num_workers=config.num_workers['train'], shuffle=True)
+		DataLoaderMIX('train', iteration),
+		batch_size=config.batch_size['train'],
+		num_workers=config.num_workers['train'],
+		shuffle=True, worker_init_fn=_init_fn,
+	)
+
 	loss_criterian = DataParallelCriterion(Criterian())
 
 	model.train()
@@ -102,6 +109,9 @@ def train(model, optimizer, iteration):
 			image, character_map, affinity_map = image.cuda(), character_map.cuda(), affinity_map.cuda()
 			character_weight, affinity_weight = character_weight.cuda(), affinity_weight.cuda()
 
+		if (no + 1) % config.change_lr == 0:
+			optimizer = change_lr(optimizer, config.lr[iteration]*(0.8**((no + 1)//config.change_lr - 1)))
+
 		output = model(image)
 		loss = loss_criterian(
 			output,
@@ -121,7 +131,7 @@ def train(model, optimizer, iteration):
 
 		# ---------- Calculating the F-score ------------ #
 
-		if (no + 1) % config.check_iterations == 0:
+		if no % config.check_iterations == 0:
 
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
@@ -142,6 +152,10 @@ def train(model, optimizer, iteration):
 			current_count = 0
 
 			output = output.data.cpu().numpy()
+
+			output[output > 1] = 1
+			output[output < 0] = 0
+
 			original_dim = original_dim.numpy()
 
 			for __, _ in enumerate(dataset_name):
@@ -203,19 +217,22 @@ def train(model, optimizer, iteration):
 	return model, optimizer, all_loss, all_f_score
 
 
-def test(model):
+def test(model, iteration):
 
 	"""
 	Test the weak-supervised model
 	:param model: Pre-trained model on SynthText
+	:param iteration: Iteration Number
 	:return: F-score, loss
 	"""
+
+	os.makedirs(config.save_path + '/Test_'+str(iteration), exist_ok=True)
 
 	dataloader = DataLoader(
 		DataLoaderEvalOther('test'),
 		batch_size=config.batch_size['test'],
 		num_workers=config.num_workers['test'],
-		shuffle=False
+		shuffle=False, worker_init_fn=_init_fn
 	)
 
 	true_positive = 0
@@ -247,6 +264,10 @@ def test(model):
 				output = torch.cat(output, dim=0)
 
 			output = output.data.cpu().numpy()
+
+			output[output > 1] = 1
+			output[output < 0] = 0
+
 			original_dim = original_dim.cpu().numpy()
 
 			f_score = []
@@ -254,37 +275,36 @@ def test(model):
 			for i in range(output.shape[0]):
 
 				# ToDo - Visualise the test results
-				# ToDo - Why is F-score of testing always less than F-score of training at iteration 0?
 
 				# --------- Resizing it back to the original image size and saving it ----------- #
 
-				# cur_image = denormalize_mean_variance(image[i].data.cpu().numpy().transpose(1, 2, 0))
-				#
-				# max_dim = original_dim[i].max()
-				# resizing_factor = 768 / max_dim
-				# before_pad_dim = [int(original_dim[i][0] * resizing_factor), int(original_dim[i][1] * resizing_factor)]
-				#
-				# height_pad = (768 - before_pad_dim[0]) // 2
-				# width_pad = (768 - before_pad_dim[1]) // 2
-				#
-				# cur_image_backup = cv2.resize(
-				# 	cur_image[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-				# 	(original_dim[i][1], original_dim[i][0]))
-				#
-				# cur_image = cur_image_backup.copy()
-				#
-				# cv2.drawContours(cur_image, resize_bbox(original_dim[i], output[i], config)['word_bbox'], -1, (0, 255, 0), 2)
-				# plt.imsave(str(i)+'_predicted.png', cur_image.astype(np.uint8))
-				#
-				# cur_image = cur_image_backup.copy()
-				# cv2.drawContours(cur_image, np.array(annots[i]['bbox']), -1, (0, 255, 0), 2)
-				# plt.imsave(str(i) + '_target.png', cur_image.astype(np.uint8))
+				cur_image = denormalize_mean_variance(image[i].data.cpu().numpy().transpose(1, 2, 0))
+
+				max_dim = original_dim[i].max()
+				resizing_factor = 768 / max_dim
+				before_pad_dim = [int(original_dim[i][0] * resizing_factor), int(original_dim[i][1] * resizing_factor)]
+
+				height_pad = (768 - before_pad_dim[0]) // 2
+				width_pad = (768 - before_pad_dim[1]) // 2
+
+				cur_image = cv2.resize(
+					cur_image[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
+					(original_dim[i][1], original_dim[i][0]))
+
+				cv2.drawContours(cur_image, resize_bbox(original_dim[i], output[i], config)['word_bbox'], -1, (0, 255, 0), 2)
+				cv2.drawContours(cur_image, np.array(annots[i]['bbox']), -1, (0, 0, 255), 2)
+
+				plt.imsave(
+					config.save_path + '/Test_' + str(iteration) + '/' + image_name[i],
+					cur_image.astype(np.uint8))
 
 				score_calc = calculate_fscore(
 						resize_bbox(original_dim[i], output[i], config)['word_bbox'][:, :, 0, :],
 						np.array(annots[i]['bbox']),
 						text_target=annots[i]['text'],
 					)
+
+				print(score_calc['f_score'])
 				f_score.append(
 					score_calc['f_score']
 				)
@@ -293,8 +313,6 @@ def test(model):
 				num_positive += score_calc['num_positive']
 
 				# --------------- PostProcessing for creating the targets for the next iteration ---------------- #
-
-			# exit(0)
 
 			all_accuracy.append(np.mean(f_score))
 

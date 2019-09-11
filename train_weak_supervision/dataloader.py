@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import os
 import json
+from PIL import Image
 
 import train_weak_supervision.config as config
 from src.utils.data_manipulation import resize, resize_generated, normalize_mean_variance
@@ -84,14 +85,13 @@ class DataLoaderMIX(data.Dataset):
 
 		self.gt = []
 
-		for i in sorted(os.listdir(self.base_path_other_gt)):
+		for no, i in enumerate(sorted(os.listdir(self.base_path_other_gt))):
 			with open(self.base_path_other_gt+'/'+i, 'r') as f:
 				self.gt.append([i[:-5], json.load(f)])
 
 	def __getitem__(self, item_i):
 
 		# noinspection PyArgumentList
-		np.random.seed()
 		check = np.random.uniform()
 
 		if check < config.prob_synth and self.type_ == 'train':
@@ -149,7 +149,7 @@ class DataLoaderMIX(data.Dataset):
 			# Resize the image to (768, 768)
 			image, character, affinity = resize_generated(image, character.copy(), affinity.copy())
 			image = normalize_mean_variance(image).transpose(2, 0, 1)
-			weights = [i for i in self.gt[random_item][1]['weights'].copy()]
+			weights = np.array(self.gt[random_item][1]['weights'])
 			text_target = '#@#@#@'.join(self.gt[random_item][1]['text'])
 
 			assert len(self.gt[random_item][1]['text']) == len(self.gt[random_item][1]['word_bbox']), \
@@ -159,13 +159,24 @@ class DataLoaderMIX(data.Dataset):
 			# 	'Some error in splitting'
 
 			# Generate character heatmap with weights
-			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights.copy())
+			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights[:, 0].tolist())
 
 			# Generate affinity heatmap with weights
-			weight_affinity, weak_supervision_affinity = generate_target_others(image.shape, affinity.copy(), weights.copy())
+			weight_affinity, weak_supervision_affinity = generate_target_others(image.shape, affinity.copy(), weights[:, 1].tolist(), type_='aff')
 
 			# Get original word_bbox annotations
 			dataset_name = 'ICDAR'
+
+		# # For CRAFT-Model
+		#
+		# weight_character = np.array(
+		# 	Image.fromarray((weight_character*255).astype(np.uint8)).resize((768//2, 768//2)))/255
+		# weight_affinity = np.array(
+		# 	Image.fromarray((weight_affinity*255).astype(np.uint8)).resize((768//2, 768//2)))/255
+		# weak_supervision_char = np.array(
+		# 	Image.fromarray((weak_supervision_char*255).astype(np.uint8)).resize((768//2, 768//2)))/255
+		# weak_supervision_affinity = np.array(
+		# 	Image.fromarray((weak_supervision_affinity*255).astype(np.uint8)).resize((768//2, 768//2)))/255
 
 		return \
 			image.astype(np.float32), \

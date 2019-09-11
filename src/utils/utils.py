@@ -559,12 +559,12 @@ def calculate_fscore(pred, target, text_target, unknown='###', text_pred=None, t
 
 	if pred.shape[0] == target.shape[0] == 0:
 		return {
-			'f_score': 1,
-			'precision': 1,
-			'recall': 1,
-			'false_positive': 0,
-			'true_positive': 0,
-			'num_positive': 0
+			'f_score': 1.0,
+			'precision': 1.0,
+			'recall': 1.0,
+			'false_positive': 0.0,
+			'true_positive': 0.0,
+			'num_positive': 0.0
 		}
 
 	if text_pred is None:
@@ -608,11 +608,21 @@ def calculate_fscore(pred, target, text_target, unknown='###', text_pred=None, t
 	else:
 		num_positive = len(target)
 
+	if true_positive == 0 and num_positive == 0:
+		return {
+			'f_score': 1.0,
+			'precision': 1.0,
+			'recall': 1.0,
+			'false_positive': false_positive,
+			'true_positive': true_positive,
+			'num_positive': num_positive
+		}
+
 	if true_positive == 0:
 		return {
-			'f_score': 0,
-			'precision': 0,
-			'recall': 0,
+			'f_score': 0.0,
+			'precision': 0.0,
+			'recall': 0.0,
 			'false_positive': false_positive,
 			'true_positive': true_positive,
 			'num_positive': num_positive

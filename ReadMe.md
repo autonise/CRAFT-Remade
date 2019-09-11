@@ -124,6 +124,8 @@ To generate the json files for IC15 -
 			'target_folder_path': None,  --> path to where you downloaded the train gt (Challenge4_Test_Task1_GT)
 		}
 		
+	Run the command - 
+		
 	python main.py pre_process --dataset IC15
 
 #### Second Train your model based on weak-supervision
