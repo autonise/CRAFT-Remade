@@ -347,4 +347,4 @@ def test(model, iteration):
 
 		torch.cuda.empty_cache()
 
-	return np.mean(all_accuracy)
+	return 2*precision*recall/(precision + recall), precision, recall
