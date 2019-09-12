@@ -32,7 +32,7 @@ Put the images inside a folder.
 
 | Dataset | Recall | Precision | F-score |
 |---------|--------|-----------|---------|
-| ICDAR2013 | TBD | TBD | 0.7051(Improving) |
+| ICDAR2013 | TBD | TBD | 0.8201(Improving) |
 | ICDAR2015 | TBD | TBD | TBD(Coming Soon) |
 | ICDAR2017 | TBD | TBD | TBD(Coming Soon) |
 | Total Text | TBD | TBD | TBD(Coming Soon) |
@@ -48,9 +48,9 @@ Original Model by authors - https://drive.google.com/open?id=1ZQE0tK9498RhLcXwYR
     
 ### Weak Supervision
 
-- [ ] ICDAR 2013 - https://drive.google.com/open?id=1hs1xoLuHwEqNUVAxsXqf2WOQZKhCcF3H
+- [ ] ICDAR 2013 - https://drive.google.com/file/d/16dl08NtuXX0_8N-vi6uNqQHe83eIvy3U/view?usp=sharing
 - [ ] ICDAR 2015 - In Progress
-- [ ] ICDAR 2017 - yet_to_be_completed
+- [ ] ICDAR 2017 - In Progress
 - [ ] Total Text - yet_to_be_completed
 - [ ] MS-COCO - yet_to_be_completed
     
