@@ -89,8 +89,13 @@ def weak_supervision(model, iterations):
 			generate_target(model, iteration)
 
 			print('Testing for iteration:', iteration)
-			f_score_test = test(model, iteration)
-			print('Test Results for iteration:', iteration, ' | F-score: ', f_score_test)
+			f_score_test, precision_test, recall_test = test(model, iteration)
+			print(
+				'Test Results for iteration:', iteration,
+				' | F-score: ', f_score_test,
+				' | Precision: ', precision_test,
+				' | Recall: ', recall_test
+			)
 
 		print('Fine-tuning for iteration:', iteration)
 		model, optimizer, loss, accuracy = train(model, optimizer, iteration)
