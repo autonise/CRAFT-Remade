@@ -1,20 +1,27 @@
 from shapely.geometry import Polygon
 import numpy as np
 import cv2
+import config
 
+# Done so that the edge has a value of ~ 0.4
+center = config.window//2
+gaussian_heatmap = np.zeros([config.window, config.window], dtype=np.float32)
 
-sigma = 18
-threshold_point = 25
-window = 120
-center = window//2
-gaussian_heatmap = np.zeros([window, window], dtype=np.float32)
-
-for i_ in range(window):
-	for j_ in range(window):
-		gaussian_heatmap[i_, j_] = 1 / 2 / np.pi / (sigma ** 2) * np.exp(
-			-1 / 2 * ((i_ - center) ** 2 + (j_ - center) ** 2) / (sigma ** 2))
+for i_ in range(config.window):
+	for j_ in range(config.window):
+		gaussian_heatmap[i_, j_] = 1 / 2 / np.pi / (config.sigma ** 2) * np.exp(
+			-1 / 2 * ((i_ - center) ** 2 + (j_ - center) ** 2) / (config.sigma ** 2))
 
 gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
+
+gaussian_heatmap_aff = np.zeros([config.window, config.window], dtype=np.float32)
+
+for i_ in range(config.window):
+	for j_ in range(config.window):
+		gaussian_heatmap_aff[i_, j_] = 1 / 2 / np.pi / (config.sigma_aff ** 2) * np.exp(
+			-1 / 2 * ((i_ - center) ** 2 + (j_ - center) ** 2) / (config.sigma_aff ** 2))
+
+gaussian_heatmap_aff = (gaussian_heatmap_aff / np.max(gaussian_heatmap_aff) * 255).astype(np.uint8)
 
 
 def normalize_mean_variance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.229, 0.224, 0.225)):
@@ -36,25 +43,6 @@ def denormalize_mean_variance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.22
 	return img
 
 
-def order_points(pts):
-
-	"""
-	Orders the 4 co-ordinates of a bounding box, top-left, top-right, bottom-right, bottom-left
-	:param pts: numpy array with shape [4, 2]
-	:return: numpy array, shape = [4, 2], ordered bbox
-	"""
-
-	rect = np.zeros((4, 2), dtype="float32")
-	s = pts.sum(axis=1)
-	rect[0] = pts[np.argmin(s)]
-	rect[2] = pts[np.argmax(s)]
-	diff = np.diff(pts, axis=1)
-	rect[1] = pts[np.argmin(diff)]
-	rect[3] = pts[np.argmax(diff)]
-
-	return rect
-
-
 def four_point_transform(image, pts, size):
 
 	"""
@@ -69,7 +57,7 @@ def four_point_transform(image, pts, size):
 
 	center_pt = np.mean(pts, axis=0)
 	pts = pts - center_pt[None, :]
-	pts = pts*center/threshold_point
+	pts = pts*center/config.threshold_point
 	pts = pts + center_pt[None, :]
 
 	dst = np.array([
@@ -153,44 +141,57 @@ def resize_generated(image, character, affinity, side=768):
 	return big_image, character, affinity
 
 
-def add_character(image, bbox):
+def add_character(image, bbox, heatmap=gaussian_heatmap):
 
 	"""
 		Add gaussian heatmap for character bbox to the image
 		:param image: 2-d array containing character heatmap
 		:param bbox: np.array, dtype=np.int32, shape = [4, 2]
+		:param heatmap: gaussian heatmap
 		:return: image in which the gaussian character bbox has been added
 	"""
 
 	# ToDo - Make this function efficient
 
 	if not Polygon(bbox.reshape([4, 2]).astype(np.int32)).is_valid:
+
 		return image
 
-	transformed = four_point_transform(gaussian_heatmap.copy(), bbox.astype(np.float32), [image.shape[0], image.shape[1]])
+	bbox_top_left = np.min(bbox, axis=0)
+	bbox_top_right = np.max(bbox, axis=0)
+
+
+
+	transformed = four_point_transform(heatmap, bbox.astype(np.float32), [image.shape[0], image.shape[1]])
 
 	image = np.maximum(image, transformed)
 
 	return image
 
 
-def add_character_others(image, weight_map, weight_val, bbox):
+def add_character_others(image, weight_map, weight_val, bbox, type_='char'):
 	"""
 		Add gaussian heatmap for character bbox to the image and also generate weighted map for weak-supervision
 		:param image: 2-d array containing character heatmap
 		:param weight_map: 2-d array containing weight heatmap
 		:param weight_val: weight to be given to the current bbox
 		:param bbox: np.array, dtype=np.int32, shape = [4, 2]
+		:param type_: used to distinguish which gaussian heatmap to use for affinity and characters
 		:return:    image in which the gaussian character bbox has been added,
 					weight_map in which the weight as per weak-supervision has been calculated
 	"""
 
 	# ToDo - Make this function efficient
 
+	if type_ == 'char':
+		heatmap = gaussian_heatmap.copy()
+	else:
+		heatmap = gaussian_heatmap_aff.copy()
+
 	transformed = four_point_transform(
-		gaussian_heatmap.copy(), bbox.astype(np.float32), [weight_map.shape[0], weight_map.shape[1]])
+		heatmap, bbox.astype(np.float32), [weight_map.shape[0], weight_map.shape[1]])
 	image = np.maximum(image, transformed)
-	weight_map = np.maximum(weight_map, np.float32(transformed >= 0.4*255)*weight_val)
+	weight_map = np.maximum(weight_map, np.float32(transformed >= config.THRESHOLD_POSITIVE*255)*weight_val)
 
 	return image, weight_map
 
@@ -207,12 +208,14 @@ def add_affinity(image, bbox_1, bbox_2):
 
 	if (not Polygon(bbox_1.reshape([4, 2]).astype(np.int32)).is_valid) or (
 			not Polygon(bbox_2.reshape([4, 2]).astype(np.int32)).is_valid):
-		return image
-
-	bbox_1 = order_points(bbox_1)
-	bbox_2 = order_points(bbox_2)
+		return image, np.zeros([4, 2])
 
 	center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
+
+	# ToDo - No guarantee that bbox is ordered, hence affinity can be wrong
+
+	# Shifted the affinity so that adjacent affinity do not touch each other
+
 	tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
 	bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
 	tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
@@ -220,7 +223,7 @@ def add_affinity(image, bbox_1, bbox_2):
 
 	affinity = np.array([tl, tr, br, bl])
 
-	return add_character(image, affinity)
+	return add_character(image, affinity, heatmap=gaussian_heatmap_aff), affinity
 
 
 def two_char_bbox_to_affinity(bbox_1, bbox_2):
@@ -239,10 +242,10 @@ def two_char_bbox_to_affinity(bbox_1, bbox_2):
 	bbox_1 = bbox_1[:, 0, :].copy()
 	bbox_2 = bbox_2[:, 0, :].copy()
 
-	bbox_1 = order_points(bbox_1)
-	bbox_2 = order_points(bbox_2)
-
 	center_1, center_2 = np.mean(bbox_1, axis=0), np.mean(bbox_2, axis=0)
+
+	# Shifted the affinity so that adjacent affinity do not touch each other
+
 	tl = np.mean([bbox_1[0], bbox_1[1], center_1], axis=0)
 	bl = np.mean([bbox_1[2], bbox_1[3], center_1], axis=0)
 	tr = np.mean([bbox_2[0], bbox_2[1], center_2], axis=0)
@@ -265,9 +268,6 @@ def add_affinity_others(image, weight, weight_val, bbox_1, bbox_2):
 		:return:    image in which the gaussian affinity bbox has been added between bbox_1 and bbox_2,
 					weight_map in which the weight as per weak-supervision has been calculated
 	"""
-
-	bbox_1 = order_points(bbox_1)
-	bbox_2 = order_points(bbox_2)
 
 	affinity = two_char_bbox_to_affinity(bbox_1, bbox_2)
 
@@ -297,18 +297,19 @@ def generate_target(image_size, character_bbox, weight=None):
 		target = add_character(target, character_bbox[i].copy())
 
 	if weight is not None:
-		return target/255, np.float32(target >= 0.4)
+		return target/255, np.float32(target >= config.THRESHOLD_POSITIVE*255)
 	else:
 		return target/255
 
 
-def generate_target_others(image_size, character_bbox, weight):
+def generate_target_others(image_size, character_bbox, weight, type_='char'):
 	"""
 
 		:param image_size: size of the image on which the target needs to be generated
 		:param character_bbox: np.array, shape = [word_length, num_characters, 4, 1, 2]
 		:param weight: this function is currently only used for icdar2013, so weight is the value of weight
 																							for each character bbox
+		:param type_: used to differentiate between gaussian heatmap to be used for affinity and characters
 		:return: if weight is not None then target_character_heatmap otherwise target_character_heatmap,
 																				weight for weak-supervision
 		"""
@@ -326,7 +327,7 @@ def generate_target_others(image_size, character_bbox, weight):
 		for i in range(character_bbox[word_no].shape[0]):
 
 			target, weight_map = add_character_others(
-				target, weight_map, weight[word_no], character_bbox[word_no][i].copy()[:, 0, :])
+				target, weight_map, weight[word_no], character_bbox[word_no][i].copy()[:, 0, :], type_=type_)
 
 	return target/255, weight_map
 
@@ -356,21 +357,24 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 
 	total_letters = 0
 
+	all_affinity_bbox = []
+
 	for word in text:
 		for char_num in range(len(word)-1):
-			target = add_affinity(target, character_bbox[total_letters].copy(), character_bbox[total_letters+1].copy())
+			target, bbox = add_affinity(target, character_bbox[total_letters].copy(), character_bbox[total_letters+1].copy())
 			total_letters += 1
+			all_affinity_bbox.append(bbox)
 		total_letters += 1
 
 	target = target / 255
 
 	if weight is not None:
 
-		return target, np.float32(target >= 0.4)
+		return target, np.float32(target >= config.THRESHOLD_POSITIVE)
 
 	else:
 
-		return target
+		return target, all_affinity_bbox
 
 
 def generate_affinity_others(image_size, character_bbox, weight):

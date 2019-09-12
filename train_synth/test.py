@@ -1,7 +1,7 @@
 import train_synth.config as config
 from train_synth.dataloader import DataLoaderSYNTH
 from src.utils.parallel import DataParallelModel, DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch
+from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch, _init_fn
 from src.generic_model import Criterian
 from src.utils.data_manipulation import denormalize_mean_variance
 
@@ -157,7 +157,7 @@ def main(model_path):
 
 	test_dataloader = DataLoader(
 		test_dataloader, batch_size=config.batch_size['test'],
-		shuffle=True, num_workers=config.num_workers['test'])
+		shuffle=True, num_workers=config.num_workers['test'], worker_init_fn=_init_fn)
 
 	print('Got the dataloader')
 

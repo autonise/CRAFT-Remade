@@ -2,24 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="119932cc-1b58-48ee-bc3e-1c17fe5770fd" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/mayank.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dictionaries/mayank.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/craft_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/craft_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/generic_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/generic_model.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/check_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/check_dataset.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/utils/data_manipulation.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/data_manipulation.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/utils_old.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/utils_old.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/vgg16bn.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/vgg16bn.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_synth/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/train_synth/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/dataloader.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_synth/synthesize.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/synthesize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/train_synth/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_synth/train.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/train_weak_supervision/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/dataloader.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train_weak_supervision/trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_weak_supervision/trainer.py" afterDir="false" />

@@ -92,14 +92,39 @@ class DataLoaderSYNTH(data.Dataset):
 			image = image[:, :, 0: 3]
 
 		image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
+		normal_image = image.astype(np.uint8).copy()
 		image = normalize_mean_variance(image).transpose(2, 0, 1)
-		weight_character = generate_target(image.shape, character.copy())  # Generate character heatmap
-		weight_affinity = generate_affinity(image.shape, character.copy(), self.txt[item].copy())  # Generate affinity heatmap
+
+		# Generate character heatmap
+		weight_character = generate_target(image.shape, character.copy())
+
+		# Generate affinity heatmap
+		weight_affinity, affinity_bbox = generate_affinity(image.shape, character.copy(), self.txt[item].copy())
+
+		cv2.drawContours(
+			normal_image,
+			np.array(affinity_bbox).reshape([len(affinity_bbox), 4, 1, 2]).astype(np.int64), -1, (0, 255, 0), 2)
+
+		enlarged_affinity_bbox = []
+
+		for i in affinity_bbox:
+			center = np.mean(i, axis=0)
+			i = i - center[None, :]
+			i = i*60/25
+			i = i + center[None, :]
+			enlarged_affinity_bbox.append(i)
+
+		cv2.drawContours(
+			normal_image,
+			np.array(enlarged_affinity_bbox).reshape([len(affinity_bbox), 4, 1, 2]).astype(np.int64),
+			-1, (0, 0, 255), 2
+		)
 
 		return \
 			image.astype(np.float32), \
 			weight_character.astype(np.float32), \
-			weight_affinity.astype(np.float32)
+			weight_affinity.astype(np.float32), \
+			normal_image
 
 	def __len__(self):
 

@@ -5,20 +5,19 @@ import os
 from shutil import copyfile
 import numpy as np
 import matplotlib.pyplot as plt
-import random
 
 from src.generic_model import Criterian
 from .dataloader import DataLoaderSYNTH
 from src.utils.data_manipulation import denormalize_mean_variance
 import train_synth.config as config
 from src.utils.parallel import DataParallelModel, DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch
+from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch, _init_fn
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
 
-def save(data, output, target, target_affinity, no):
+def save(data, output, target, target_affinity, drawn_image, no):
 
 	"""
 	Saving the synthesised outputs in between the training
@@ -34,6 +33,7 @@ def save(data, output, target, target_affinity, no):
 	data = data.data.cpu().numpy()
 	target = target.data.cpu().numpy()
 	target_affinity = target_affinity.data.cpu().numpy()
+	drawn_image = drawn_image.data.cpu().numpy()
 
 	batch_size = output.shape[0]
 
@@ -49,22 +49,36 @@ def save(data, output, target, target_affinity, no):
 
 		plt.imsave(base+str(i) + '/image.png', denormalize_mean_variance(data[i].transpose(1, 2, 0)))
 
-		plt.imsave(base+str(i) + '/target_characters.png', target[i, :, :], cmap='gray')
-		plt.imsave(base+str(i) + '/target_affinity.png', target_affinity[i, :, :], cmap='gray')
+		plt.imsave(base+str(i) + '/target_characters.png', target[i, :, :])
+		plt.imsave(base+str(i) + '/target_affinity.png', target_affinity[i, :, :])
 
-		plt.imsave(base + str(i) + '/pred_characters.png', character_bbox, cmap='gray')
-		plt.imsave(base + str(i) + '/pred_affinity.png', affinity_bbox, cmap='gray')
+		blob = np.logical_or(
+			target[i, :, :] > config.threshold_character,
+			target_affinity[i, :, :] > config.threshold_affinity
+		)
+
+		blob = np.float32(blob)
+
+		plt.imsave(base + str(i) + '/blob.png', blob)
+
+		plt.imsave(base + str(i) + '/pred_characters.png', character_bbox)
+		plt.imsave(base + str(i) + '/pred_affinity.png', affinity_bbox)
 
 		# Thresholding the character and affinity heatmap
 
 		plt.imsave(
 			base + str(i) + '/pred_characters_thresh.png',
-			np.float32(character_bbox > config.threshold_character),
-			cmap='gray')
+			np.float32(character_bbox > config.threshold_character)
+		)
 		plt.imsave(
 			base + str(i) + '/pred_affinity_thresh.png',
-			np.float32(affinity_bbox > config.threshold_affinity),
-			cmap='gray')
+			np.float32(affinity_bbox > config.threshold_affinity)
+		)
+
+		plt.imsave(
+			base + str(i) + '/drawn_image.png',
+			drawn_image[i]
+		)
 
 
 def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, all_accuracy):
@@ -93,7 +107,7 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 				for param_group in optimizer.param_groups:
 					param_group['lr'] = config.lr[i]
 
-	for no, (image, weight, weight_affinity) in enumerate(iterator):
+	for no, (image, weight, weight_affinity, drawn_image) in enumerate(iterator):
 
 		change_lr(no)
 
@@ -108,7 +122,7 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 			image, weight, weight_affinity = image.cuda(), weight.cuda(), weight_affinity.cuda()
 
 		output = model(image)
-		loss = loss_criterian(output, weight, weight_affinity).mean()/4
+		loss = loss_criterian(output, weight, weight_affinity).mean()/config.optimizer_iteration
 
 		all_loss.append(loss.item()*config.optimizer_iteration)
 
@@ -118,7 +132,7 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 			optimizer.step()
 			optimizer.zero_grad()
 
-		if no >= 0:
+		if no >= 2000:
 
 			# Calculating the f-score after some iterations because initially there are a lot of stray contours
 
@@ -171,9 +185,9 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
 
-			save(image, output, weight, weight_affinity, no)
+			save(image, output, weight, weight_affinity, drawn_image, no)
 
-		if no % config.periodic_save == 0:
+		if no % config.periodic_save == 0 and no != 0:
 
 			torch.save(
 				{
@@ -189,20 +203,7 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 	return all_loss
 
 
-def seed():
-
-	# This removes randomness, makes everything deterministic
-
-	np.random.seed(config.seed)
-	random.seed(config.seed)
-	torch.manual_seed(config.seed)
-	torch.cuda.manual_seed(config.seed)
-	torch.backends.cudnn.deterministic = True
-
-
 def main():
-
-	seed()
 
 	copyfile('train_synth/config.py', config.save_path + '/config.py')
 
@@ -245,7 +246,7 @@ def main():
 	train_dataloader = DataLoaderSYNTH('train')
 	train_dataloader = DataLoader(
 		train_dataloader, batch_size=config.batch_size['train'],
-		shuffle=True, num_workers=config.num_workers['train'])
+		shuffle=True, num_workers=config.num_workers['train'], worker_init_fn=_init_fn)
 
 	print('Loaded the dataloader')
 
@@ -265,8 +266,3 @@ def main():
 	plt.clf()
 
 	print("Saved Final Model")
-
-
-if __name__ == "__main__":
-
-	main()

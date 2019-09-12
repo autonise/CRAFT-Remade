@@ -137,7 +137,6 @@ To generate the json files for IC15 -
 		}
 
 Run the command - 
-
 	python main.py pre_process --dataset IC15
 
 #### Second Train your model based on weak-supervision

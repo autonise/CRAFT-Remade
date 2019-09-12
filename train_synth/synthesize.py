@@ -2,7 +2,7 @@ import train_synth.config as config
 from src.utils.data_manipulation import generate_target_others, denormalize_mean_variance
 from train_synth.dataloader import DataLoaderEval
 from src.utils.parallel import DataParallelModel
-from src.utils.utils import generate_word_bbox, get_weighted_character_target, calculate_fscore
+from src.utils.utils import generate_word_bbox, get_weighted_character_target, calculate_fscore, _init_fn
 
 import cv2
 import json
@@ -16,7 +16,9 @@ import matplotlib.pyplot as plt
 os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)  # Specify which GPU you want to use
 
 
-def synthesize(dataloader, model, base_path_affinity, base_path_character, base_path_bbox):
+def synthesize(
+		dataloader,
+		model, base_path_affinity, base_path_character, base_path_bbox, base_path_char, base_path_aff, base_path_json):
 
 	"""
 
@@ -27,6 +29,9 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character, base_
 	:param base_path_affinity: Path where to store the predicted affinity heatmap
 	:param base_path_character: Path where to store the predicted character heatmap
 	:param base_path_bbox: Path where to store the word_bbox overlapped on images
+	:param base_path_aff: Path where to store the predicted affinity bbox
+	:param base_path_char: Path where to store the predicted character bbox
+	:param base_path_json: Path where to store the predicted bbox in json format
 	:return: None
 	"""
 
@@ -87,13 +92,36 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character, base_
 					affinity_bbox,
 					character_threshold=config.threshold_character,
 					affinity_threshold=config.threshold_affinity,
-					word_threshold=config.threshold_word)['word_bbox']
+					word_threshold=config.threshold_word,
+					character_threshold_upper=config.threshold_character_upper,
+					affinity_threshold_upper=config.threshold_affinity_upper,
+					scaling_character=config.scale_character,
+					scaling_affinity=config.scale_affinity
+				)
 
-				cv2.drawContours(image_i, predicted_bbox, -1, (0, 255, 0), 2)
+				word_bbox = predicted_bbox['word_bbox']
+				char_bbox = np.concatenate(predicted_bbox['characters'], axis=0)
+				aff_bbox = np.concatenate(predicted_bbox['affinity'], axis=0)
+
+				word_image = image_i.copy()
+				char_image = image_i.copy()
+				aff_image = image_i.copy()
+
+				cv2.drawContours(word_image, word_bbox, -1, (0, 255, 0), 2)
+				cv2.drawContours(char_image, char_bbox, -1, (0, 255, 0), 2)
+				cv2.drawContours(aff_image, aff_bbox, -1, (0, 255, 0), 2)
+
+				plt.imsave(
+					base_path_char + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.png',
+					char_image)
+
+				plt.imsave(
+					base_path_aff + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.png',
+					aff_image)
 
 				plt.imsave(
 					base_path_bbox + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.png',
-					image_i)
+					word_image)
 
 				plt.imsave(
 					base_path_character + '/' + '.'.join(image_name[i].split('.')[:-1]) + '.png',
@@ -105,8 +133,17 @@ def synthesize(dataloader, model, base_path_affinity, base_path_character, base_
 					np.float32(affinity_bbox > config.threshold_affinity),
 					cmap='gray')
 
+				predicted_bbox['word_bbox'] = predicted_bbox['word_bbox'].tolist()
+				predicted_bbox['characters'] = [_.tolist() for _ in predicted_bbox['characters']]
+				predicted_bbox['affinity'] = [_.tolist() for _ in predicted_bbox['affinity']]
 
-def generate_next_targets(original_dim, output, image, base_target_path, image_name, annots, dataloader):
+				with open(base_path_json + '/' + '.'.join(image_name[i].split('.')[:-1])+'.json', 'w') as f:
+					json.dump(predicted_bbox, f)
+
+
+def generate_next_targets(original_dim, output, image, base_target_path, image_name, annots, dataloader, no):
+
+	visualize = config.visualize_generated and no % config.visualize_freq == 0 and no != 0
 
 	max_dim = original_dim.max()
 	resizing_factor = 768 / max_dim
@@ -119,11 +156,11 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 
 	character_bbox = cv2.resize(
 		output[0, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-		(original_dim[1], original_dim[0])) / 255
+		(original_dim[1]//2, original_dim[0]//2)) / 255
 
 	affinity_bbox = cv2.resize(
 		output[1, height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
-		(original_dim[1], original_dim[0])) / 255
+		(original_dim[1]//2, original_dim[0]//2)) / 255
 
 	# Generating word-bbox given character and affinity heatmap
 
@@ -131,9 +168,22 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 		character_bbox, affinity_bbox,
 		character_threshold=config.threshold_character,
 		affinity_threshold=config.threshold_affinity,
-		word_threshold=config.threshold_word)
+		word_threshold=config.threshold_word,
+		character_threshold_upper=config.threshold_character_upper,
+		affinity_threshold_upper=config.threshold_affinity_upper,
+		scaling_character=config.scale_character,
+		scaling_affinity=config.scale_affinity
+	)
 
-	if config.visualize_generated:
+	generated_targets['word_bbox'] = generated_targets['word_bbox'] * 2
+	generated_targets['characters'] = [i * 2 for i in generated_targets['characters']]
+	generated_targets['affinity'] = [i * 2 for i in generated_targets['affinity']]
+
+	if visualize:
+
+		character_bbox = cv2.resize((character_bbox*255).astype(np.uint8), (original_dim[1], original_dim[0])) / 255
+
+		affinity_bbox = cv2.resize((affinity_bbox*255).astype(np.uint8), (original_dim[1], original_dim[0])) / 255
 
 		image_i = denormalize_mean_variance(image.data.cpu().numpy().transpose(1, 2, 0))
 
@@ -145,13 +195,13 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 		# Saving affinity heat map
 		plt.imsave(
 			base_target_path + '_predicted/affinity/' + '.'.join(image_name.split('.')[:-1]) + '.png',
-			np.float32(affinity_bbox > config.threshold_affinity),
+			np.float32(affinity_bbox > config.threshold_affinity_upper),
 			cmap='gray')
 
 		# Saving character heat map
 		plt.imsave(
 			base_target_path + '_predicted/character/' + '.'.join(image_name.split('.')[:-1]) + '.png',
-			np.float32(character_bbox > config.threshold_character), cmap='gray')
+			np.float32(character_bbox > config.threshold_character_upper), cmap='gray')
 
 		cv2.drawContours(
 			image_i,
@@ -169,7 +219,9 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 	generated_targets = get_weighted_character_target(
 		generated_targets, {'bbox': annots['bbox'], 'text': annots['text']},
 		dataloader.dataset.unknown,
-		config.threshold_fscore, config.weight_threshold)
+		config.threshold_fscore,
+		config.weight_threshold
+	)
 
 	target_word_bbox = generated_targets['word_bbox'].copy()
 
@@ -180,7 +232,7 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 			unknown=dataloader.dataset.gt['unknown']
 		)['f_score']
 
-	if config.visualize_generated:
+	if visualize:
 		image_i = denormalize_mean_variance(image.data.cpu().numpy().transpose(1, 2, 0))
 		image_i = cv2.resize(
 			image_i[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
@@ -201,13 +253,13 @@ def generate_next_targets(original_dim, output, image, base_target_path, image_n
 		affinity_target, affinity_weight_map = generate_target_others(
 			(image_i.shape[0], image_i.shape[1]),
 			generated_targets['affinity'].copy(),
-			generated_targets['weights'].copy())
+			np.array(generated_targets['weights'])[:, 1])
 
 		# Generate character heatmap after postprocessing
 		character_target, characters_weight_map = generate_target_others(
 			(image_i.shape[0], image_i.shape[1]),
 			generated_targets['characters'].copy(),
-			generated_targets['weights'].copy())
+			np.array(generated_targets['weights'])[:, 0])
 
 		# Saving the affinity heatmap
 		plt.imsave(
@@ -295,10 +347,9 @@ def synthesize_with_score(dataloader, model, base_target_path):
 						image_name[i],
 						annots[i],
 						dataloader,
+						no
 					)
 				)
-
-				# --------- Resizing it back to the original image size and saving it ----------- #
 
 			mean_f_score.append(np.mean(f_score))
 
@@ -310,38 +361,54 @@ def main(
 		base_path_character=None,
 		base_path_affinity=None,
 		base_path_bbox=None,
+		base_path_char=None,
+		base_path_aff=None,
+		base_path_json=None,
 		model_path=None,
-		model=None):
+		model=None,
+):
 
 	"""
 	Entry function for synthesising character and affinity heatmap on images given in a folder using a pre-trained model
 	:param folder_path: Path of folder where the images are
 	:param base_path_character: Path where to store the character heatmap
 	:param base_path_affinity: Path where to store the affinity heatmap
+	:param base_path_char: Path where to store the image with character contours
+	:param base_path_aff: Path where to store the image with affinity contours
 	:param base_path_bbox: Path where to store the generated word_bbox overlapped on the image
+	:param base_path_json: Path where to store the generated bbox in json format
 	:param model_path: Path where the pre-trained model is stored
 	:param model: If model is provided directly use it instead of loading it
 	:return:
 	"""
 
+	if base_path_character is None:
+		base_path_character = '/'.join(folder_path.split('/')[:-1])+'/character_heatmap'
+	if base_path_affinity is None:
+		base_path_affinity = '/'.join(folder_path.split('/')[:-1]) + '/affinity_heatmap'
+	if base_path_bbox is None:
+		base_path_bbox = '/'.join(folder_path.split('/')[:-1]) + '/word_bbox'
+	if base_path_aff is None:
+		base_path_aff = '/'.join(folder_path.split('/')[:-1])+'/affinity_bbox'
+	if base_path_char is None:
+		base_path_char = '/'.join(folder_path.split('/')[:-1]) + '/character_bbox'
+	if base_path_json is None:
+		base_path_json = '/'.join(folder_path.split('/')[:-1])+'/json_annotations'
+
 	os.makedirs(base_path_affinity, exist_ok=True)
 	os.makedirs(base_path_character, exist_ok=True)
+	os.makedirs(base_path_aff, exist_ok=True)
+	os.makedirs(base_path_char, exist_ok=True)
 	os.makedirs(base_path_bbox, exist_ok=True)
-
-	if base_path_character is None:
-		base_path_character = '/'.join(folder_path.split('/')[:-1])+'/target_character'
-	if base_path_affinity is None:
-		base_path_affinity = '/'.join(folder_path.split('/')[:-1])+'/target_affinity'
-	if base_path_bbox is None:
-		base_path_bbox = '/'.join(folder_path.split('/')[:-1])+'/word_bbox'
+	os.makedirs(base_path_json, exist_ok=True)
 
 	# Dataloader to pre-process images given in the folder
 
 	infer_dataloader = DataLoaderEval(folder_path)
 
 	infer_dataloader = DataLoader(
-		infer_dataloader, batch_size=2,
-		shuffle=True, num_workers=2)
+		infer_dataloader, batch_size=config.batch_size['test'],
+		shuffle=True, num_workers=config.num_workers['test'], worker_init_fn=_init_fn)
 
 	if model is None:
 
@@ -366,7 +433,9 @@ def main(
 		else:
 			model.load_state_dict(saved_model)
 
-	synthesize(infer_dataloader, model, base_path_affinity, base_path_character, base_path_bbox)
+	synthesize(
+		infer_dataloader,
+		model, base_path_affinity, base_path_character, base_path_bbox, base_path_char, base_path_aff, base_path_json)
 
 
 def generator_(base_target_path, model_path=None, model=None):
@@ -403,7 +472,7 @@ def generator_(base_target_path, model_path=None, model=None):
 
 	infer_dataloader = DataLoader(
 		infer_dataloader, batch_size=config.batch_size['test'],
-		shuffle=False, num_workers=config.num_workers['test'])
+		shuffle=False, num_workers=config.num_workers['test'], worker_init_fn=_init_fn)
 
 	if model is None:
 

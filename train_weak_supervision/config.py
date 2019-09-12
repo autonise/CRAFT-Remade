@@ -24,22 +24,34 @@ num_workers = {
 
 
 lr = {
-	0: 1e-6,
-	1: 1e-6,
-	2: 5e-7,
-	3: 5e-7,
-	4: 5e-7,
-	5: 5e-7,
-	6: 1e-7,
-	7: 1e-7,
-	8: 1e-7,
-	9: 1e-7,
+	0: 5e-5,
+	1: 1e-5,
+	2: 1e-5,
+	3: 1e-5,
+	4: 5e-6,
+	5: 5e-6,
+	6: 5e-6,
+	7: 5e-6,
+	8: 5e-6,
+	9: 5e-6,
+	10: 5e-7,
+	11: 5e-7,
+	12: 1e-7,
+	13: 1e-7,
+	14: 1e-7,
+	15: 1e-7,
+	16: 1e-7,
+	17: 1e-7,
+	18: 1e-7,
+	19: 1e-7,
 }
 
 optimizer_iterations = 1
-iterations = batch_size['train']*2500*optimizer_iterations
-check_iterations = 1249
-calc_f_score = 100
+iterations = batch_size['train']*12500*optimizer_iterations
+check_iterations = 5000
+calc_f_score = 1000
+change_lr = 1000
+test_now = 1000
 
 model_architecture = 'craft'
 
