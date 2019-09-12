@@ -7,7 +7,6 @@ import random
 def seed(config=None):
 
 	# This removes randomness, makes everything deterministic
-	# ToDo - Make everything seeded, currently dataloader is random
 
 	if config is None:
 		import config
@@ -66,6 +65,7 @@ def weak_supervision(model, iterations):
 	"""
 
 	from train_weak_supervision.__init__ import get_initial_model_optimizer, generate_target, train, save_model, test
+	import config
 
 	# ToDo - Check the effects of using optimizer of Synth-Text or starting from a random optimizer
 
@@ -81,22 +81,16 @@ def weak_supervision(model, iterations):
 		4) Saving the final model	
 	"""
 
-	skip_iterations = []
+	for iteration in range(config.start_iteration, int(iterations)):
 
-	for iteration in range(int(iterations)):
-
-		if iteration not in skip_iterations:
+		if iteration not in config.skip_iterations:
 
 			print('Generating for iteration:', iteration)
 			generate_target(model, iteration)
 
-			# exit(0)
-
 			print('Testing for iteration:', iteration)
 			f_score_test = test(model, iteration)
 			print('Test Results for iteration:', iteration, ' | F-score: ', f_score_test)
-
-			# exit(0)
 
 		print('Fine-tuning for iteration:', iteration)
 		model, optimizer, loss, accuracy = train(model, optimizer, iteration)

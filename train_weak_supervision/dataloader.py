@@ -4,7 +4,6 @@ import numpy as np
 import cv2
 import os
 import json
-from PIL import Image
 
 import train_weak_supervision.config as config
 from src.utils.data_manipulation import resize, resize_generated, normalize_mean_variance
@@ -155,28 +154,16 @@ class DataLoaderMIX(data.Dataset):
 			assert len(self.gt[random_item][1]['text']) == len(self.gt[random_item][1]['word_bbox']), \
 				'Length of word_bbox != Length of text'
 
-			# assert len(text_target.split('#@#@#@')) == len(self.gt[random_item][1]['word_bbox']), \
-			# 	'Some error in splitting'
-
 			# Generate character heatmap with weights
-			weight_character, weak_supervision_char = generate_target_others(image.shape, character.copy(), weights[:, 0].tolist())
+			weight_character, weak_supervision_char = generate_target_others(
+				image.shape, character.copy(), weights[:, 0].tolist())
 
 			# Generate affinity heatmap with weights
-			weight_affinity, weak_supervision_affinity = generate_target_others(image.shape, affinity.copy(), weights[:, 1].tolist(), type_='aff')
+			weight_affinity, weak_supervision_affinity = generate_target_others(
+				image.shape, affinity.copy(), weights[:, 1].tolist(), type_='aff')
 
 			# Get original word_bbox annotations
 			dataset_name = 'ICDAR'
-
-		# # For CRAFT-Model
-		#
-		# weight_character = np.array(
-		# 	Image.fromarray((weight_character*255).astype(np.uint8)).resize((768//2, 768//2)))/255
-		# weight_affinity = np.array(
-		# 	Image.fromarray((weight_affinity*255).astype(np.uint8)).resize((768//2, 768//2)))/255
-		# weak_supervision_char = np.array(
-		# 	Image.fromarray((weak_supervision_char*255).astype(np.uint8)).resize((768//2, 768//2)))/255
-		# weak_supervision_affinity = np.array(
-		# 	Image.fromarray((weak_supervision_affinity*255).astype(np.uint8)).resize((768//2, 768//2)))/255
 
 		return \
 			image.astype(np.float32), \

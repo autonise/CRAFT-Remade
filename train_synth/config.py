@@ -38,8 +38,8 @@ periodic_output = 3000*optimizer_iteration
 periodic_save = 3000*optimizer_iteration
 
 visualize_generated = True
-visualize_freq = 20
+visualize_freq = 21000
 
-weight_threshold = 0.9
+weight_threshold = 0.5
 
 model_architecture = 'craft'

@@ -2,7 +2,7 @@ from train_weak_supervision.dataloader import DataLoaderMIX, DataLoaderEvalOther
 import train_weak_supervision.config as config
 from src.generic_model import Criterian
 from src.utils.parallel import DataParallelCriterion
-from src.utils.utils import calculate_batch_fscore, calculate_fscore, resize_bbox, _init_fn
+from src.utils.utils import calculate_batch_fscore, calculate_fscore, resize_bbox, _init_fn, generate_word_bbox
 from src.utils.data_manipulation import denormalize_mean_variance
 
 from torch.utils.data import DataLoader
@@ -24,20 +24,38 @@ def save(no, dataset_name, output, image, character_map, affinity_map, character
 
 		os.makedirs('Temporary/'+str(no)+'/'+str(__), exist_ok=True)
 
-		plt.imsave('Temporary/'+str(no)+'/'+str(__)+'/image_.png', denormalize_mean_variance(
-			image[__].data.cpu().numpy().transpose(1, 2, 0)))
+		generated = generate_word_bbox(
+			output[__, 0].data.cpu().numpy(), output[__, 1].data.cpu().numpy(),
+			config.threshold_character, config.threshold_affinity, config.threshold_word,
+			config.threshold_character_upper, config.threshold_affinity_upper, config.scale_character, config.scale_affinity
+		)
+
+		output_image = denormalize_mean_variance(
+			image[__].data.cpu().numpy().transpose(1, 2, 0))
+
+		cv2.drawContours(output_image, generated['word_bbox'], -1, (0, 255, 0), 2)
+
+		plt.imsave('Temporary/'+str(no)+'/'+str(__)+'/image_.png', output_image)
 
 		cv2.imwrite('Temporary/'+str(no)+'/'+str(__)+'/char_map.png', np.uint8(output[__, 0].data.cpu().numpy()*255))
 
 		cv2.imwrite('Temporary/'+str(no)+'/'+str(__)+'/aff_map.png', np.uint8(output[__, 1].data.cpu().numpy()*255))
 
 		cv2.imwrite(
-			'Temporary/'+str(no)+'/'+str(__)+'/char_map_threshold.png',
-			np.uint8(np.float32(output[__, 0].data.cpu().numpy() > config.threshold_character_upper)*255))
+			'Temporary/' + str(no) + '/' + str(__) + '/char_map_threshold_upper.png',
+			np.uint8(np.float32(output[__, 0].data.cpu().numpy() > config.threshold_character_upper) * 255))
 
 		cv2.imwrite(
-			'Temporary/'+str(no)+'/'+str(__)+'/aff_map_threshold.png',
-			np.uint8(np.float32(output[__, 1].data.cpu().numpy() > config.threshold_affinity_upper)*255))
+			'Temporary/' + str(no) + '/' + str(__) + '/aff_map_threshold_upper.png',
+			np.uint8(np.float32(output[__, 1].data.cpu().numpy() > config.threshold_affinity_upper) * 255))
+
+		cv2.imwrite(
+			'Temporary/' + str(no) + '/' + str(__) + '/char_map_threshold_lower.png',
+			np.uint8(np.float32(output[__, 0].data.cpu().numpy() > config.threshold_character) * 255))
+
+		cv2.imwrite(
+			'Temporary/' + str(no) + '/' + str(__) + '/aff_map_threshold_lower.png',
+			np.uint8(np.float32(output[__, 1].data.cpu().numpy() > config.threshold_affinity) * 255))
 
 		cv2.imwrite(
 			'Temporary/'+str(no)+'/'+str(__)+'/target_char_map.png', np.uint8(character_map[__].data.cpu().numpy()*255))
@@ -131,7 +149,7 @@ def train(model, optimizer, iteration):
 
 		# ---------- Calculating the F-score ------------ #
 
-		if no % config.check_iterations == 0:
+		if (no + 1) % config.check_iterations == 0:
 
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
@@ -196,6 +214,7 @@ def train(model, optimizer, iteration):
 			f_score = 0
 			precision = 0
 			recall = 0
+#
 
 		iterator.set_description(
 			'Loss:' + str(int(loss.item() * config.optimizer_iterations * 100000) / 100000) + ' Iterations:[' + str(no)
@@ -206,6 +225,12 @@ def train(model, optimizer, iteration):
 			'| Average Recall: ' + str(recall) +
 			'| Average Precision: ' + str(precision)
 		)
+
+		if (no + 1) % config.test_now == 0:
+
+			del image, loss, affinity_weight, character_weight, affinity_map, character_map, output
+			print('\nF-score of testing: ', test(model, iteration), '\n')
+			model.train()
 
 	if len(iterator) % config.optimizer_iterations != 0:
 
@@ -274,8 +299,6 @@ def test(model, iteration):
 
 			for i in range(output.shape[0]):
 
-				# ToDo - Visualise the test results
-
 				# --------- Resizing it back to the original image size and saving it ----------- #
 
 				cur_image = denormalize_mean_variance(image[i].data.cpu().numpy().transpose(1, 2, 0))
@@ -304,7 +327,6 @@ def test(model, iteration):
 						text_target=annots[i]['text'],
 					)
 
-				print(score_calc['f_score'])
 				f_score.append(
 					score_calc['f_score']
 				)

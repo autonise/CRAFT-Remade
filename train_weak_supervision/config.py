@@ -47,10 +47,11 @@ lr = {
 }
 
 optimizer_iterations = 1
-iterations = batch_size['train']*25000*optimizer_iterations
-check_iterations = 1000
-calc_f_score = 100
+iterations = batch_size['train']*12500*optimizer_iterations
+check_iterations = 5000
+calc_f_score = 1000
 change_lr = 1000
+test_now = 1000
 
 model_architecture = 'craft'
 

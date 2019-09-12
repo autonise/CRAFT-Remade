@@ -1,32 +1,25 @@
 from shapely.geometry import Polygon
 import numpy as np
 import cv2
-
-
-THRESHOLD_POSITIVE = 0.2
+import config
 
 # Done so that the edge has a value of ~ 0.4
-sigma = 18.5
-threshold_point = 25
-window = 120
-center = window//2
-gaussian_heatmap = np.zeros([window, window], dtype=np.float32)
+center = config.window//2
+gaussian_heatmap = np.zeros([config.window, config.window], dtype=np.float32)
 
-for i_ in range(window):
-	for j_ in range(window):
-		gaussian_heatmap[i_, j_] = 1 / 2 / np.pi / (sigma ** 2) * np.exp(
-			-1 / 2 * ((i_ - center) ** 2 + (j_ - center) ** 2) / (sigma ** 2))
+for i_ in range(config.window):
+	for j_ in range(config.window):
+		gaussian_heatmap[i_, j_] = 1 / 2 / np.pi / (config.sigma ** 2) * np.exp(
+			-1 / 2 * ((i_ - center) ** 2 + (j_ - center) ** 2) / (config.sigma ** 2))
 
 gaussian_heatmap = (gaussian_heatmap / np.max(gaussian_heatmap) * 255).astype(np.uint8)
 
+gaussian_heatmap_aff = np.zeros([config.window, config.window], dtype=np.float32)
 
-sigma_aff = 20
-gaussian_heatmap_aff = np.zeros([window, window], dtype=np.float32)
-
-for i_ in range(window):
-	for j_ in range(window):
-		gaussian_heatmap_aff[i_, j_] = 1 / 2 / np.pi / (sigma_aff ** 2) * np.exp(
-			-1 / 2 * ((i_ - center) ** 2 + (j_ - center) ** 2) / (sigma_aff ** 2))
+for i_ in range(config.window):
+	for j_ in range(config.window):
+		gaussian_heatmap_aff[i_, j_] = 1 / 2 / np.pi / (config.sigma_aff ** 2) * np.exp(
+			-1 / 2 * ((i_ - center) ** 2 + (j_ - center) ** 2) / (config.sigma_aff ** 2))
 
 gaussian_heatmap_aff = (gaussian_heatmap_aff / np.max(gaussian_heatmap_aff) * 255).astype(np.uint8)
 
@@ -64,7 +57,7 @@ def four_point_transform(image, pts, size):
 
 	center_pt = np.mean(pts, axis=0)
 	pts = pts - center_pt[None, :]
-	pts = pts*center/threshold_point
+	pts = pts*center/config.threshold_point
 	pts = pts + center_pt[None, :]
 
 	dst = np.array([
@@ -164,6 +157,11 @@ def add_character(image, bbox, heatmap=gaussian_heatmap):
 
 		return image
 
+	bbox_top_left = np.min(bbox, axis=0)
+	bbox_top_right = np.max(bbox, axis=0)
+
+
+
 	transformed = four_point_transform(heatmap, bbox.astype(np.float32), [image.shape[0], image.shape[1]])
 
 	image = np.maximum(image, transformed)
@@ -193,7 +191,7 @@ def add_character_others(image, weight_map, weight_val, bbox, type_='char'):
 	transformed = four_point_transform(
 		heatmap, bbox.astype(np.float32), [weight_map.shape[0], weight_map.shape[1]])
 	image = np.maximum(image, transformed)
-	weight_map = np.maximum(weight_map, np.float32(transformed >= THRESHOLD_POSITIVE*255)*weight_val)
+	weight_map = np.maximum(weight_map, np.float32(transformed >= config.THRESHOLD_POSITIVE*255)*weight_val)
 
 	return image, weight_map
 
@@ -299,7 +297,7 @@ def generate_target(image_size, character_bbox, weight=None):
 		target = add_character(target, character_bbox[i].copy())
 
 	if weight is not None:
-		return target/255, np.float32(target >= THRESHOLD_POSITIVE*255)
+		return target/255, np.float32(target >= config.THRESHOLD_POSITIVE*255)
 	else:
 		return target/255
 
@@ -372,7 +370,7 @@ def generate_affinity(image_size, character_bbox, text, weight=None):
 
 	if weight is not None:
 
-		return target, np.float32(target >= THRESHOLD_POSITIVE)
+		return target, np.float32(target >= config.THRESHOLD_POSITIVE)
 
 	else:
 
