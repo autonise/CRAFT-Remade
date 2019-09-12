@@ -28,15 +28,27 @@ Put the images inside a folder.
 
     python main.py synthesize --model=./model/final_model.pkl --folder=./input
     
+## Results
+
+| Dataset | Recall | Precision | F-score |
+|---------|--------|-----------|---------|
+| ICDAR2013 | TBD | TBD | 0.7051(Improving) |
+| ICDAR2015 | TBD | TBD | TBD(Coming Soon) |
+| ICDAR2017 | TBD | TBD | TBD(Coming Soon) |
+| Total Text | TBD | TBD | TBD(Coming Soon) |
+| MS COCO | TBD | TBD | TBD(Coming Soon) |
+
 ## Pre-trained models
 
 ### Strong Supervision
 
-SynthText - https://drive.google.com/open?id=1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<br>
+SynthText(CRAFT Model) - https://drive.google.com/open?id=1QH0B-iQ1Ob2HkWCQ2bVCsLPwVSmbcSgN<br>
+SynthText(ResNet-UNet Model) - https://drive.google.com/file/d/1qnLM_iMnR1P_6OLoUoFtrReHe4bpFW3T<br>
+Original Model by authors - https://drive.google.com/open?id=1ZQE0tK9498RhLcXwYRgod4upmrYWdgl9<br>
     
 ### Weak Supervision
 
-- [ ] ICDAR 2013 - In Progress
+- [ ] ICDAR 2013 - https://drive.google.com/open?id=1hs1xoLuHwEqNUVAxsXqf2WOQZKhCcF3H
 - [ ] ICDAR 2015 - In Progress
 - [ ] ICDAR 2017 - yet_to_be_completed
 - [ ] Total Text - yet_to_be_completed
@@ -106,7 +118,7 @@ To generate the json files for IC13 -
 			'target_folder_path': None,  --> path to where you downloaded the train gt (Challenge2_Test_Task1_GT)
 		}
 		
-	Run the command - 
+Run the command - 
 	
 	python main.py pre_process --dataset IC13
 		
@@ -123,9 +135,8 @@ To generate the json files for IC15 -
 			'target_json_path': None,  --> path to where you want the target json file (Images/test_gt.json)
 			'target_folder_path': None,  --> path to where you downloaded the train gt (Challenge4_Test_Task1_GT)
 		}
-		
-	Run the command - 
-		
+
+Run the command - 
 	python main.py pre_process --dataset IC15
 
 #### Second Train your model based on weak-supervision
