@@ -34,7 +34,10 @@ def train_synth():
 	:return: None
 	"""
 
-	from train_synth import train
+	import os
+	from train_synth import train, config
+
+	os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 	train.main()
 
 
@@ -48,7 +51,10 @@ def test_synth(model):
 	:return: None
 	"""
 
-	from train_synth import test
+	import os
+	from train_synth import test, config
+
+	os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 	test.main(model)
 
 
@@ -64,8 +70,11 @@ def weak_supervision(model, iterations):
 	:return: None
 	"""
 
-	from train_weak_supervision.__init__ import get_initial_model_optimizer, generate_target, train, save_model, test
-	import config
+	from train_weak_supervision.__init__ import get_initial_model_optimizer, \
+		generate_target, train, save_model, test, config
+	import os
+
+	os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
 
 	# ToDo - Check the effects of using optimizer of Synth-Text or starting from a random optimizer
 
@@ -111,7 +120,10 @@ def weak_supervision(model, iterations):
 @click.option('-folder', '--folder', help='Path to the image folder', required=True)
 def synthesize(model, folder):
 
-	from train_synth import synthesize
+	from train_synth import synthesize, config
+	import os
+
+	os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)  # Specify which GPU you want to use
 
 	if model is None:
 		print('Please Enter the model path')

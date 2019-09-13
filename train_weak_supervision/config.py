@@ -6,7 +6,7 @@ from config import *
 seed = 0
 
 use_cuda = True
-num_cuda = "0,1,2,3"
+num_cuda = "1,2,3"
 
 prob_synth = 1/6
 

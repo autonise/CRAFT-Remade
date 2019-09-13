@@ -13,8 +13,6 @@ import cv2
 import torch
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
-
 
 def save(no, dataset_name, output, image, character_map, affinity_map, character_weight, affinity_weight):
 

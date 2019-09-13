@@ -487,7 +487,11 @@ def generate_word_bbox_batch(
 		batch_affinity_heatmap,
 		character_threshold,
 		affinity_threshold,
-		word_threshold):
+		word_threshold,
+		character_threshold_upper,
+		affinity_threshold_upper,
+		scaling_character,
+		scaling_affinity):
 
 	"""
 
@@ -498,9 +502,13 @@ def generate_word_bbox_batch(
 									shape = [batch_size, height, width], value range [0, 1]
 	:param batch_affinity_heatmap: Batch Affinity Heatmap, numpy array, dtype=np.float32,
 									shape = [batch_size, height, width], value range [0, 1]
-	:param character_threshold: Threshold above which we say pixel belongs to a character
-	:param affinity_threshold: Threshold above which we say a pixel belongs to a affinity
+	:param character_threshold: Threshold above which we say pixel belongs to a word
+	:param affinity_threshold: Threshold above which we say a pixel belongs to a word
 	:param word_threshold: Threshold above which we say a group of characters compromise a word
+	:param character_threshold_upper: Threshold above which we say pixel belongs to a character
+	:param affinity_threshold_upper: Threshold above which we say pixel belongs to a affinity
+	:param scaling_character: Scale to stop the reducing dimension problem
+	:param scaling_affinity: Scale to stop the reducing dimension problem
 	:return: word_bbox
 	"""
 
@@ -514,7 +522,12 @@ def generate_word_bbox_batch(
 			batch_affinity_heatmap[i],
 			character_threshold,
 			affinity_threshold,
-			word_threshold)
+			word_threshold,
+			character_threshold_upper,
+			affinity_threshold_upper,
+			scaling_character,
+			scaling_affinity
+		)
 
 		word_bbox.append(returned['word_bbox'])
 

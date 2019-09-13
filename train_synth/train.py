@@ -14,9 +14,6 @@ from src.utils.parallel import DataParallelModel, DataParallelCriterion
 from src.utils.utils import calculate_batch_fscore, generate_word_bbox_batch, _init_fn
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
-
-
 def save(data, output, target, target_affinity, no):
 
 	"""
@@ -67,11 +64,11 @@ def save(data, output, target, target_affinity, no):
 
 		plt.imsave(
 			base + str(i) + '/pred_characters_thresh.png',
-			np.float32(character_bbox > config.threshold_character)
+			np.float32(character_bbox > config.threshold_character_upper)
 		)
 		plt.imsave(
 			base + str(i) + '/pred_affinity_thresh.png',
-			np.float32(affinity_bbox > config.threshold_affinity)
+			np.float32(affinity_bbox > config.threshold_affinity_upper)
 		)
 
 
@@ -141,6 +138,10 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 					character_threshold=config.threshold_character,
 					affinity_threshold=config.threshold_affinity,
 					word_threshold=config.threshold_word,
+					character_threshold_upper=config.threshold_character_upper,
+					affinity_threshold_upper=config.threshold_affinity_upper,
+					scaling_character=config.scale_character,
+					scaling_affinity=config.scale_affinity
 				)
 
 				target_bbox = generate_word_bbox_batch(
@@ -149,6 +150,10 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 					character_threshold=config.threshold_character,
 					affinity_threshold=config.threshold_affinity,
 					word_threshold=config.threshold_word,
+					character_threshold_upper=config.threshold_character_upper,
+					affinity_threshold_upper=config.threshold_affinity_upper,
+					scaling_character=config.scale_character,
+					scaling_affinity=config.scale_affinity
 				)
 
 				all_accuracy.append(
@@ -156,6 +161,13 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 						predicted_bbox, target_bbox, threshold=config.threshold_fscore, text_target=None
 					)
 				)
+
+		if (no + 1) % config.periodic_output == 0:
+
+			if type(output) == list:
+				output = torch.cat(output, dim=0)
+
+			save(image, output, weight, weight_affinity, no)
 
 		if len(all_accuracy) == 0:
 			iterator.set_description(
@@ -174,14 +186,7 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 				'| Average F-Score: ' + str(int(np.array(all_accuracy)[-min(1000, len(all_accuracy)):].mean()*100000000)/100000000)
 			)
 
-		if no % config.periodic_output == 0:
-
-			if type(output) == list:
-				output = torch.cat(output, dim=0)
-
-			save(image, output, weight, weight_affinity, no)
-
-		if no % config.periodic_save == 0 and no != 0:
+		if (no + 1) % config.periodic_save == 0:
 
 			torch.save(
 				{

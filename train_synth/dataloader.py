@@ -5,6 +5,7 @@ import cv2
 import os
 import train_synth.config as config
 from src.utils.data_manipulation import resize, normalize_mean_variance, generate_affinity, generate_target
+# import time
 
 """
 	globally generating gaussian heatmap which will be warped for every character bbox
@@ -94,12 +95,19 @@ class DataLoaderSYNTH(data.Dataset):
 		image, character = resize(image, self.charBB[item].copy())  # Resize the image to (768, 768)
 		image = normalize_mean_variance(image).transpose(2, 0, 1)
 
+		# start = time.time()
+
 		# Generate character heatmap
 		weight_character = generate_target(image.shape, character.copy())
+
+		# print('Time taken to generate characters: ', time.time() - start)
+		# start = time.time()
 
 		# Generate affinity heatmap
 		weight_affinity, affinity_bbox = generate_affinity(image.shape, character.copy(), self.txt[item].copy())
 
+		# print('Time taken for generating characters: ', time.time() - start)
+		# print()
 		return \
 			image.astype(np.float32), \
 			weight_character.astype(np.float32), \

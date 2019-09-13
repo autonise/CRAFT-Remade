@@ -13,8 +13,6 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)  # Specify which GPU you want to use
-
 
 def synthesize(
 		dataloader,

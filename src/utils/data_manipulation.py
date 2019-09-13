@@ -43,22 +43,17 @@ def denormalize_mean_variance(in_img, mean=(0.485, 0.456, 0.406), variance=(0.22
 	return img
 
 
-def four_point_transform(image, pts, size):
+def four_point_transform(image, bbox, size):
 
 	"""
 	Using the pts and the image a perspective transform is performed which returns the transformed 2d Gaussian image
 	:param image: np.array, dtype=np.uint8, shape = [height, width]
-	:param pts: np.array, dtype=np.float32 or np.int32, shape = [4, 2]
+	:param bbox: np.array, dtype=np.float32 or np.int32, shape = [4, 2]
 	:param size: size of the original image, list [height, width]
 	:return:
 	"""
 
 	height, width = size
-
-	center_pt = np.mean(pts, axis=0)
-	pts = pts - center_pt[None, :]
-	pts = pts*center/config.threshold_point
-	pts = pts + center_pt[None, :]
 
 	dst = np.array([
 		[0, 0],
@@ -66,7 +61,7 @@ def four_point_transform(image, pts, size):
 		[image.shape[1] - 1, image.shape[0] - 1],
 		[0, image.shape[0] - 1]], dtype="float32")
 
-	warped = cv2.warpPerspective(image, cv2.getPerspectiveTransform(dst, pts), (width, height))
+	warped = cv2.warpPerspective(image, cv2.getPerspectiveTransform(dst, bbox), (width, height))
 
 	return warped
 
@@ -157,14 +152,43 @@ def add_character(image, bbox, heatmap=gaussian_heatmap):
 
 		return image
 
-	bbox_top_left = np.min(bbox, axis=0)
-	bbox_top_right = np.max(bbox, axis=0)
+	# Extending the bbox
 
+	center_pt = np.mean(bbox, axis=0)
+	bbox = bbox - center_pt[None, :]
+	bbox = bbox * center / config.threshold_point
+	bbox = bbox + center_pt[None, :]
 
+	# Finding the minimum x and y of the bbox
 
-	transformed = four_point_transform(heatmap, bbox.astype(np.float32), [image.shape[0], image.shape[1]])
+	top, left = np.min(bbox[:, 1]), np.min(bbox[:, 0])
 
-	image = np.maximum(image, transformed)
+	bbox[:, 1] = bbox[:, 1] - top
+	bbox[:, 0] = bbox[:, 0] - left
+
+	height, width = np.max(bbox[:, 1]), np.max(bbox[:, 0])
+
+	int_height = int(height + 1)
+	int_width = int(width + 1)
+	int_top = int(top)
+	int_left = int(left)
+
+	image_top = min(max(0, int_top), image.shape[0])
+	image_left = min(max(0, int_left), image.shape[1])
+	image_bottom = min(max(0, int_top + int_height), image.shape[0])
+	image_right = min(max(0, int_left + int_width), image.shape[1])
+
+	transformed_top = min(max(0, -int_top), int_height)
+	transformed_left = min(max(0, -int_left), int_width)
+	transformed_bottom = min(min(max(0, int_height + int_top), image.shape[0]) - int_top, int_height)
+	transformed_right = min(min(max(0, int_width + int_left), image.shape[1]) - int_left, int_width)
+
+	transformed = four_point_transform(heatmap, bbox.astype(np.float32), [int_height, int_width])
+
+	image[image_top:image_bottom, image_left:image_right] = np.maximum(
+		image[image_top:image_bottom, image_left:image_right],
+		transformed[transformed_top:transformed_bottom, transformed_left:transformed_right]
+	)
 
 	return image
 
@@ -190,6 +214,7 @@ def add_character_others(image, weight_map, weight_val, bbox, type_='char'):
 
 	transformed = four_point_transform(
 		heatmap, bbox.astype(np.float32), [weight_map.shape[0], weight_map.shape[1]])
+
 	image = np.maximum(image, transformed)
 	weight_map = np.maximum(weight_map, np.float32(transformed >= config.THRESHOLD_POSITIVE*255)*weight_val)
 
