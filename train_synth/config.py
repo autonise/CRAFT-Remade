@@ -3,7 +3,7 @@ Config containing all hardcoded parameters for training strong supervised model 
 """
 from config import *
 
-num_cuda = "0,1,2,3"
+num_cuda = "0,1"
 save_path = '/home/SharedData/Mayank/Models/SYNTH'
 use_cuda = True
 
@@ -13,7 +13,7 @@ batch_size = {
 }
 
 num_workers = {
-	'train': 0,
+	'train': 16,
 	'test': 16
 }
 
@@ -39,7 +39,7 @@ periodic_output = 3000*optimizer_iteration
 periodic_save = 3000*optimizer_iteration
 
 visualize_generated = True
-visualize_freq = 21000
+visualize_freq = 200
 
 weight_threshold = 0.5
 

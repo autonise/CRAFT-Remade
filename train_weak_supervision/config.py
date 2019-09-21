@@ -6,7 +6,7 @@ from config import *
 seed = 0
 
 use_cuda = True
-num_cuda = "1,2,3"
+num_cuda = "0,1"
 
 prob_synth = 1/6
 
@@ -24,34 +24,34 @@ num_workers = {
 
 
 lr = {
-	0: 5e-5,
-	1: 1e-5,
-	2: 1e-5,
+	0: 1e-4,
+	1: 5e-5,
+	2: 5e-5,
 	3: 1e-5,
-	4: 5e-6,
-	5: 5e-6,
+	4: 1e-5,
+	5: 1e-5,
 	6: 5e-6,
 	7: 5e-6,
 	8: 5e-6,
 	9: 5e-6,
-	10: 5e-7,
-	11: 5e-7,
-	12: 1e-7,
-	13: 1e-7,
-	14: 1e-7,
-	15: 1e-7,
-	16: 1e-7,
-	17: 1e-7,
+	10: 1e-6,
+	11: 1e-6,
+	12: 1e-6,
+	13: 1e-6,
+	14: 5e-7,
+	15: 5e-7,
+	16: 5e-7,
+	17: 5e-7,
 	18: 1e-7,
 	19: 1e-7,
 }
 
-optimizer_iterations = 1
+optimizer_iterations = 4//len(num_cuda.split(','))
 iterations = batch_size['train']*12500*optimizer_iterations
-check_iterations = 5000
-calc_f_score = 1000
-change_lr = 1000
-test_now = 1000
+check_iterations = 2500*optimizer_iterations
+calc_f_score = 50*optimizer_iterations
+change_lr = 500*optimizer_iterations
+test_now = 500*optimizer_iterations
 
 model_architecture = 'craft'
 

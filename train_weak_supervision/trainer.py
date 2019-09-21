@@ -126,7 +126,7 @@ def train(model, optimizer, iteration):
 			character_weight, affinity_weight = character_weight.cuda(), affinity_weight.cuda()
 
 		if (no + 1) % config.change_lr == 0:
-			optimizer = change_lr(optimizer, config.lr[iteration]*(0.8**((no + 1)//config.change_lr - 1)))
+			optimizer = change_lr(optimizer, config.lr[iteration]*(0.9**((no + 1)//config.change_lr - 1)))
 
 		output = model(image)
 		loss = loss_criterian(
@@ -147,7 +147,7 @@ def train(model, optimizer, iteration):
 
 		# ---------- Calculating the F-score ------------ #
 
-		if (no + 1) % config.check_iterations == 0:
+		if no % config.check_iterations == 0:
 
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
@@ -312,7 +312,7 @@ def test(model, iteration):
 					cur_image[height_pad:height_pad + before_pad_dim[0], width_pad:width_pad + before_pad_dim[1]],
 					(original_dim[i][1], original_dim[i][0]))
 
-				cv2.drawContours(cur_image, resize_bbox(original_dim[i], output[i], config)['word_bbox'], -1, (0, 255, 0), 2)
+				cv2.drawContours(cur_image, resize_bbox(original_dim[i], output[i], config, horizontal_rect=True)['word_bbox'], -1, (0, 255, 0), 2)
 				cv2.drawContours(cur_image, np.array(annots[i]['bbox']), -1, (0, 0, 255), 2)
 
 				plt.imsave(

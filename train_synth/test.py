@@ -75,17 +75,25 @@ def test(dataloader, loss_criterian, model):
 		model.eval()
 		iterator = tqdm(dataloader)
 		all_loss = []
+		all_char_loss = []
+		all_aff_loss = []
 		all_accuracy = []
 
 		for no, (image, weight, weight_affinity) in enumerate(iterator):
+
+			if no == 15:
+				break
 
 			if config.use_cuda:
 				image, weight, weight_affinity = image.cuda(), weight.cuda(), weight_affinity.cuda()
 
 			output = model(image)
-			loss = loss_criterian(output, weight, weight_affinity).mean()
+			loss, loss_character, loss_affinity = loss_criterian(output, weight, weight_affinity, individual=True)
+			loss, loss_character, loss_affinity = loss.mean(), loss_character.mean(), loss_affinity.mean()
 
 			all_loss.append(loss.item())
+			all_char_loss.append(loss_character.item())
+			all_aff_loss.append(loss_affinity.item())
 
 			if type(output) == list:
 				output = torch.cat(output, dim=0)
@@ -99,6 +107,10 @@ def test(dataloader, loss_criterian, model):
 				character_threshold=config.threshold_character,
 				affinity_threshold=config.threshold_affinity,
 				word_threshold=config.threshold_word,
+				character_threshold_upper=config.threshold_character_upper,
+				affinity_threshold_upper=config.threshold_affinity_upper,
+				scaling_character=config.scale_character,
+				scaling_affinity=config.scale_affinity
 			)
 
 			target_bbox = generate_word_bbox_batch(
@@ -107,16 +119,22 @@ def test(dataloader, loss_criterian, model):
 				character_threshold=config.threshold_character,
 				affinity_threshold=config.threshold_affinity,
 				word_threshold=config.threshold_word,
+				character_threshold_upper=config.threshold_character_upper,
+				affinity_threshold_upper=config.threshold_affinity_upper,
+				scaling_character=config.scale_character,
+				scaling_affinity=config.scale_affinity
 			)
 
 			all_accuracy.append(
 				calculate_batch_fscore(predicted_bbox, target_bbox, threshold=config.threshold_fscore, text_target=None))
 
 			iterator.set_description(
-				'Loss:' + str(int(loss.item() * 100000000) / 100000000) + ' Iterations:[' + str(no) + '/' + str(
+				'Loss:' + str(int(loss.item() * 100000) / 100000) + ' Iterations:[' + str(no) + '/' + str(
 					len(iterator)) +
-				'] Average Loss:' + str(int(np.array(all_loss)[-min(1000, len(all_loss)):].mean()*100000000)/100000000) +
-				'| Average F-Score: ' + str(int(np.array(all_accuracy)[-min(1000, len(all_accuracy)):].mean()*100000000)/100000000)
+				'] Average Loss:' + str(int(np.array(all_loss)[-min(1000, len(all_loss)):].mean()*100000)/100000) +
+				'] Average Char Loss:' + str(int(np.array(all_char_loss)[-min(1000, len(all_char_loss)):].mean() * 100000) / 100000) +
+				'] Average Aff Loss:' + str(int(np.array(all_aff_loss)[-min(1000, len(all_aff_loss)):].mean() * 100000) / 100000) +
+				'| Average F-Score: ' + str(int(np.array(all_accuracy)[-min(1000, len(all_accuracy)):].mean()*100000)/100000)
 			)
 
 			if no % config.periodic_output == 0 and no != 0:
@@ -125,7 +143,7 @@ def test(dataloader, loss_criterian, model):
 
 				save(image, output, weight, weight_affinity, no)
 
-		return all_loss
+		return all_loss, all_char_loss, all_aff_loss
 
 
 def main(model_path):
@@ -159,10 +177,16 @@ def main(model_path):
 	print('Got the dataloader')
 
 	saved_model = torch.load(model_path)
-	model.load_state_dict(saved_model['state_dict'])
+
+	if 'saved_dict' in saved_model.keys():
+		model.load_state_dict(saved_model['state_dict'])
+	else:
+		model.load_state_dict(saved_model)
 
 	print('Loaded the model')
 
-	all_loss = test(test_dataloader, loss_criterian, model)
+	all_loss, all_char_loss, all_aff_loss = test(test_dataloader, loss_criterian, model)
 
-	print('Average Loss on the testing set is:', all_loss)
+	print('Average Loss on the testing set is:', np.mean(all_loss))
+
+	return all_loss, all_char_loss, all_aff_loss

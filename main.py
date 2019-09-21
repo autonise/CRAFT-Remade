@@ -55,6 +55,7 @@ def test_synth(model):
 	from train_synth import test, config
 
 	os.environ['CUDA_VISIBLE_DEVICES'] = str(config.num_cuda)
+
 	test.main(model)
 
 

@@ -51,7 +51,8 @@ class Criterian(nn.Module):
 
         super(Criterian, self).__init__()
 
-    def forward(self, output, character_map, affinity_map, character_weight=None, affinity_weight=None):
+    def forward(
+            self, output, character_map, affinity_map, character_weight=None, affinity_weight=None, individual=False):
 
         """
 
@@ -60,6 +61,7 @@ class Criterian(nn.Module):
         :param affinity_map: target affinity map of shape [batch_size, height, width]
         :param character_weight: weight given to each pixel using weak-supervision for characters
         :param affinity_weight: weight given to each pixel using weak-supervision for affinity
+        :param individual: if to return the affinty and character loss as well
         :return: loss containing loss of character heat map and affinity heat map reconstruction
         """
 
@@ -83,5 +85,8 @@ class Criterian(nn.Module):
         loss_affinity = hard_negative_mining(affinity, affinity_map, affinity_weight)
 
         all_loss = loss_character + loss_affinity
+
+        if individual:
+            return all_loss, loss_character, loss_affinity
 
         return all_loss

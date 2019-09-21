@@ -192,7 +192,7 @@ def train(dataloader, loss_criterian, model, optimizer, starting_no, all_loss, a
 				{
 					'state_dict': model.state_dict(),
 					'optimizer': optimizer.state_dict()
-				}, config.save_path + '/' + str(no) + '_model.pkl')
+				}, config.save_path + '/' + str((no + 1)//config.optimizer_iteration) + '_model.pkl')
 
 			np.save(config.save_path + '/loss_plot_training.npy', all_loss)
 			plt.plot(all_loss)
@@ -230,7 +230,7 @@ def main():
 		saved_model = torch.load(config.pretrained_path)
 		model.load_state_dict(saved_model['state_dict'])
 		optimizer.load_state_dict(saved_model['optimizer'])
-		starting_no = int(config.pretrained_path.split('/')[-1].split('_')[0])
+		starting_no = int(config.pretrained_path.split('/')[-1].split('_')[0])*config.optimizer_iteration
 		all_loss = np.load(config.pretrained_loss_plot_training).tolist()
 		print('Loaded the model')
 
