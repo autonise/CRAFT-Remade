@@ -108,15 +108,17 @@ def icdar2013_train(
 		cur_text = []
 
 		with open(base_path + '/' + i, 'r') as f:
-			for no, f_i in enumerate(f):
-				annots, text = f_i[:-1].split(',')[0:8], ','.join(f_i[:-1].split(',')[8:])
+			lines = f.readlines()
+			for no,line in enumerate(lines):
+				line = line.strip().split(",")
+				annots = line[:8]
+				text = ','.join(line[8:])
 				if no == 0:
 					annots[0] = annots[0][1:]
 				cur_annot.append(np.array(annots, dtype=np.int32).reshape([4, 2]).tolist())
 				cur_text.append(text)
-
-		all_annots['annots'][image_name]['bbox'] = cur_annot
-		all_annots['annots'][image_name]['text'] = cur_text
+			all_annots['annots'][image_name]['bbox'] = cur_annot
+			all_annots['annots'][image_name]['text'] = cur_text
 
 	with open(output_path, 'w') as f:
 		json.dump(all_annots, f)
